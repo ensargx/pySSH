@@ -1,6 +1,7 @@
 import socket
 import threading
 import time
+import establish
 
 class Server:
     def __init__(self, host = 'localhost', port = 22, allowed_authentication_types = ['password','public_key']):
@@ -36,8 +37,14 @@ class Server:
     def establish_connection(self, client, address):
         print("Connection from: " + str(address))
         #client_obj = Client("username")
+        if not establish.check_version(client, address):
+            """
+            Client will not be accepted if it is not a valid ssh client or if it is not version 2.0
+            """
+            client.close()
+            return
         """
-        Diğer ara işlemle, varsay 100 saniye
+        kex init 
         """
         time.sleep(100)
         #self.queue.append({client_obj: client})
