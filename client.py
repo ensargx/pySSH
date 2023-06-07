@@ -1,7 +1,3 @@
-from server import Server
-
-server = Server()
-
 class Client:
     def __init__(self,username):
         self.username = username
@@ -12,3 +8,6 @@ class Client:
     def send(self, message):
         server.send(self, message)
         pass
+
+
+from server import server

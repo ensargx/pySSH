@@ -2,6 +2,7 @@ import socket
 import threading
 import time
 import establish
+from client import Client
 
 class Server:
     def __init__(self, host = 'localhost', port = 22, allowed_authentication_types = ['password','public_key']):
@@ -31,8 +32,10 @@ class Server:
         while True:
             if self.queue:
                 client = self.queue.pop(0)
-                self.clients[client[0]] = client[1]
-                return client[0]
+                client_obj = next(iter(client))
+                socket_obj = client[client_obj]
+                self.clients[client_obj] = socket_obj
+                return client_obj
 
     def establish_connection(self, client, address):
         print("Connection from: " + str(address))
@@ -46,7 +49,11 @@ class Server:
         """
         kex init 
         """
-        time.sleep(100)
-        #self.queue.append({client_obj: client})
+        time.sleep(20)
+        client_obj = Client("username")
+        print(client_obj)
+        self.queue.append({client_obj: client})
         print(self.queue)
         
+
+server = Server()
