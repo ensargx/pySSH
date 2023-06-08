@@ -24,3 +24,14 @@ def check_version(client, address):
     # send version to client
     client.send("SSH-2.0-pySSH byEnsarGok\r\n".encode('utf-8'))
     return True
+
+def key_exchange(client, address):
+    data = client.recv(2048)
+    packet_length = int.from_bytes(data[0:4], byteorder='big')
+    padding_length = int.from_bytes(data[4:5], byteorder='big')
+    payload = data[5:packet_length - padding_length+5]
+    mac = data[packet_length + padding_length + 4:packet_length + padding_length + 5]
+    message_code = payload[0:1]
+    message_code = int.from_bytes(message_code, byteorder='big')
+    if message_code == 20:  # SSH_MSG_KEXINIT (20)
+        pass
