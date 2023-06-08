@@ -1,4 +1,5 @@
 import re
+import kexinit
 
 def check_version(client, address):
     version = client.recv(1024)
@@ -25,7 +26,7 @@ def check_version(client, address):
     client.send("SSH-2.0-pySSH byEnsarGok\r\n".encode('utf-8'))
     return True
 
-def key_exchange(client, address):
+def key_exchange_init(client, address):
     data = client.recv(2048)
     packet_length = int.from_bytes(data[0:4], byteorder='big')
     padding_length = int.from_bytes(data[4:5], byteorder='big')
@@ -33,5 +34,9 @@ def key_exchange(client, address):
     mac = data[packet_length + padding_length + 4:packet_length + padding_length + 5]
     message_code = payload[0:1]
     message_code = int.from_bytes(message_code, byteorder='big')
-    if message_code == 20:  # SSH_MSG_KEXINIT (20)
-        pass
+    if not message_code == 20:  # SSH_MSG_KEXINIT (20)
+        raise NotImplementedError
+
+    methods = kexinit.kex_get_methods(payload)  #TODO
+    # server sends kexinit packet
+    #client.send(servers_kexinit_packet)

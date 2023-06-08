@@ -46,7 +46,7 @@ class Server:
             """
             client.close()
             return
-        kex = establish.key_exchange(client, address)
+        kex = establish.key_exchange_init(client, address)
 
 
         """
