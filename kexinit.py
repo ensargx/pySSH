@@ -1,4 +1,36 @@
 
+def select_algorithm(type: str, algorithms: str):
+    """
+    Gerekli algoritmay return eder, eğer algoritma yoksa hata frlatr.
+
+    @type: str [kex, host_key, mac, public_key, compression]
+    @algorithms: str
+    @return: function
+    """
+    algorithms = algorithms.decode("utf-8").split(",")
+    my_dict = f"{type}_algorithms"
+    my_dict = globals().get(my_dict)
+    for algo in algorithms:
+        function = my_dict.get(algo)
+        if function:
+            return function
+    raise Exception("No matching kex algorithm, fix here later")
+
+# Host Key Algorithm
+def rsa_sha2_512(payload):
+    print("rsa_sha2_512")
+    raise NotImplementedError
+    return None
+
+host_key_algorithms = {'rsa-sha2-512': rsa_sha2_512}
+
+# Key Exchange Algorithm
+def sntrup(payload):
+    print("snrtup")
+    raise NotImplementedError
+    return None
+
+kex_algorithms = {'sntrup761x25519-sha512@openssh.com': sntrup}
 
 
 def kex_get_methods(payload):
