@@ -7,12 +7,16 @@ from client import Client
 class Server:
     def __init__(self, host = 'localhost', port = 22, allowed_authentication_types = ['password','public_key']):
         self.clients = {}
-        self.queue = []
         self.allowed_authentication_types = allowed_authentication_types
         self.host = host
         self.port = port
 
     def listen_process(self):
+        """
+        This function is called in a thread and listens for incoming connections
+        After the connection is made, a new thread is created to establish the ssh connection and handle the connection
+        After the process is finished, the socket is closed, and the thread is closed
+        """
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.bind((self.host, self.port))
         self.sock.listen(5)
@@ -28,17 +32,27 @@ class Server:
         listen_process = threading.Thread(target = self.listen_process)
         listen_process.start()
 
-    def accept(self):
-        while True:
-            if self.queue:
-                client = self.queue.pop(0)
-                client_obj = next(iter(client))
-                socket_obj = client[client_obj]
-                self.clients[client_obj] = socket_obj
-                return client_obj
+    def establish_connection(self, client_sock, address):
 
-    def establish_connection(self, client, address):
+        # assume that the client is a valid ssh client and username is client1_username
         print("Connection from: " + str(address))
+        client = Client("client1_username")
+        self.clients[client] = client_sock
+
+        # server will handle the connection with the server.ClientHandler class supplied by the user
+        
+        self.ClientHandler.establist(client)
+        while True:
+            data = client_sock.recv(1024)
+            if not data:
+                self.ClientHandler.leave(client)
+                self.clients.pop(client)
+                break
+            self.ClientHandler.listen(client, data)
+
+        
+
+        '''
         #client_obj = Client("username")
         if not establish.check_version(client, address):
             """
@@ -57,6 +71,8 @@ class Server:
         print(client_obj)
         self.queue.append({client_obj: client})
         print(self.queue)
+        '''
+
         
 
 server = Server()
