@@ -1,5 +1,5 @@
 import re
-import kexinit
+import pySSH.kexinit as kexinit
 
 def check_version(client, address):
     version = client.recv(1024)

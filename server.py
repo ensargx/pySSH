@@ -1,8 +1,10 @@
 import socket
 import threading
 import time
-import establish
-from client import Client
+import asyncio
+import pySSH.establish as establish
+import pySSH.exceptions as exceptions
+from pySSH.client import Client as Client
 
 class Server:
     def __init__(self, host = 'localhost', port = 22, allowed_authentication_types = ['password','public_key']):
@@ -13,6 +15,7 @@ class Server:
 
     def listen_process(self):
         """
+        # TODO
         This function is called in a thread and listens for incoming connections
         After the connection is made, a new thread is created to establish the ssh connection and handle the connection
         After the process is finished, the socket is closed, and the thread is closed
@@ -28,6 +31,10 @@ class Server:
 
         self.sock.close()
 
+    def close_conn(self, client: Client, *args, **kwargs):
+        pass
+
+
     def start(self):
         listen_process = threading.Thread(target = self.listen_process)
         listen_process.start()
@@ -36,11 +43,14 @@ class Server:
 
         # assume that the client is a valid ssh client and username is client1_username
         print("Connection from: " + str(address))
-        client = Client("client1_username")
+        client = Client(self, "client1_username")
         self.clients[client] = client_sock
 
         # server will handle the connection with the server.ClientHandler class supplied by the user
         
+        # if this function throws exception, close the connection with the exception
+        establish.check_version(client, address)
+
         self.ClientHandler.establist(client)
         while True:
             data = client_sock.recv(1024)
@@ -72,7 +82,3 @@ class Server:
         self.queue.append({client_obj: client})
         print(self.queue)
         '''
-
-        
-
-server = Server()
