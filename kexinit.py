@@ -1,5 +1,5 @@
 
-def select_algorithm(type: str, algorithms: str):
+def select_algorithm(type: str, algorithms: bytes):
     """
     Gerekli algoritmay return eder, eğer algoritma yoksa hata frlatr.
 
@@ -16,24 +16,89 @@ def select_algorithm(type: str, algorithms: str):
             return function
     raise Exception("No matching kex algorithm, fix here later")
 
+
+def curve25519_sha256(payload):
+    print("curve25519_sha256")
+    raise NotImplementedError
+    return None
+
+def curve25519_sha256_libssh_org(payload):
+    print("curve25519_sha256_libssh_org")
+    raise NotImplementedError
+    return None
+
+def ecdh_sha2_nistp256(payload):
+    print("ecdh_sha2_nistp256")
+    raise NotImplementedError
+    return None
+
+def ecdh_sha2_nistp384(payload):
+    print("ecdh_sha2_nistp384")
+    raise NotImplementedError
+    return None
+
+def ecdh_sha2_nistp521(payload):
+    print("ecdh_sha2_nistp521")
+    raise NotImplementedError
+    return None
+
+def diffie_hellman_group_exchange_sha256(payload):
+    print("diffie_hellman_group_exchange_sha256")
+    raise NotImplementedError
+    return None
+
+def diffie_hellman_group16_sha512(payload):
+    print("diffie_hellman_group16_sha512")
+    raise NotImplementedError
+    return None
+
+def diffie_hellman_group18_sha512(payload):
+    print("diffie_hellman_group18_sha512")
+    raise NotImplementedError
+    return None
+
+def diffie_hellman_group14_sha256(payload):
+    print("diffie_hellman_group14_sha256")
+    raise NotImplementedError
+    return None
+
+def diffie_hellman_group14_sha1(payload):
+    print("diffie_hellman_group14_sha1")
+    raise NotImplementedError
+    return None
+
+def diffie_hellman_group_exchange_sha1(payload):
+    print("diffie_hellman_group_exchange_sha1")
+    raise NotImplementedError
+    return None
+
+kex_algorithms = {
+    'curve25519-sha256': curve25519_sha256,
+    'curve25519-sha256@libssh.org': curve25519_sha256_libssh_org,
+    'ecdh-sha2-nistp256': ecdh_sha2_nistp256,
+    'ecdh-sha2-nistp384': ecdh_sha2_nistp384,
+    'ecdh-sha2-nistp521': ecdh_sha2_nistp521,
+    'diffie-hellman-group-exchange-sha256': diffie_hellman_group_exchange_sha256,
+    'diffie-hellman-group16-sha512': diffie_hellman_group16_sha512,
+    'diffie-hellman-group18-sha512': diffie_hellman_group18_sha512,
+    'diffie-hellman-group14-sha256': diffie_hellman_group14_sha256,
+    'diffie-hellman-group14-sha1': diffie_hellman_group14_sha1,
+    'diffie-hellman-group-exchange-sha1': diffie_hellman_group_exchange_sha1,
+    }
+
+
 # Host Key Algorithm
 def rsa_sha2_512(payload):
     print("rsa_sha2_512")
     raise NotImplementedError
     return None
 
+
 host_key_algorithms = {'rsa-sha2-512': rsa_sha2_512}
 
-# Key Exchange Algorithm
-def sntrup(payload):
-    print("snrtup")
-    raise NotImplementedError
-    return None
-
-kex_algorithms = {'sntrup761x25519-sha512@openssh.com': sntrup}
 
 
-def kex_get_methods(payload):
+def kex_get_methods(payload: bytes):
     """
     Gets the methods from the kexinit message and returns them as a dictionary
     """
@@ -42,7 +107,8 @@ def kex_get_methods(payload):
     end_payload_index = 17
 
     kex_algorithms_length = int.from_bytes(payload[end_payload_index:21], byteorder='big')
-    kex_algorithms = payload[21:21 + kex_algorithms_length] 
+    kex_algorithms = payload[21:21 + kex_algorithms_length]
+    kex = select_algorithm("kex", kex_algorithms)
     end_payload_index += 4 + kex_algorithms_length
 
     server_host_key_algorithms_length = int.from_bytes(payload[end_payload_index:end_payload_index + 4], byteorder='big')

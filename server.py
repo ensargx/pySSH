@@ -12,6 +12,8 @@ class Server:
         self.allowed_authentication_types = allowed_authentication_types
         self.host = host
         self.port = port
+        self.startup_func = lambda: None
+        self.establish_func = lambda: None
 
     def listen_process(self):
         """
@@ -31,15 +33,48 @@ class Server:
 
         self.sock.close()
 
-    def close_conn(self, client: Client, *args, **kwargs):
-        pass
+    def close_conn(self, client: Client, exception: exceptions.SSHException = None):
+        self.clients[client].send(b'Bye')
+        self.clients[client].close()
 
+    """
+    user can use @app.on_startup to add a function to be called when the server is started, it can be null
+    """
+    def on_startup(self, func):
+        if not callable(func):
+            raise TypeError("on_startup function must be callable")
+        self.startup_func = func
+
+    def on_establish(self, func):
+        if not callable(func):
+            raise TypeError("on_establish function must be callable")
+        self.establish_func = func
 
     def start(self):
+        self.startup_func()
         listen_process = threading.Thread(target = self.listen_process)
         listen_process.start()
 
     def establish_connection(self, client_sock, address):
+        """
+        This function is called in a thread and establishes the ssh connection
+        After the connection is established, the server will call the on_establish function
+        After the connection is closed, the server will call the on_leave function
+        """
+
+        # Check the SSH Version
+        establish.check_version(client_sock, address)
+
+        # Check the SSH Key Exchange
+        establish.key_exchange_init(client_sock, address)
+
+
+        # assume that the client is a valid ssh client and username is client1_username
+        client_obj = Client(self, "client1_username")
+        self.clients[client_obj] = client_sock
+        self.establish_func()
+        return
+
 
         # assume that the client is a valid ssh client and username is client1_username
         print("Connection from: " + str(address))
@@ -50,6 +85,7 @@ class Server:
         
         # if this function throws exception, close the connection with the exception
         establish.check_version(client, address)
+
 
         self.ClientHandler.establist(client)
         while True:
@@ -62,7 +98,7 @@ class Server:
 
         
 
-        '''
+
         #client_obj = Client("username")
         if not establish.check_version(client, address):
             """
@@ -81,4 +117,3 @@ class Server:
         print(client_obj)
         self.queue.append({client_obj: client})
         print(self.queue)
-        '''

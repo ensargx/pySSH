@@ -1,5 +1,6 @@
 import re
 import pySSH.kexinit as kexinit
+from pySSH.exceptions import WrongVersionException
 
 def check_version(client, address):
     version = client.recv(1024)
@@ -14,6 +15,7 @@ def check_version(client, address):
         Client will not be accepted if it is not a valid ssh client
         """
         return False
+        raise WrongVersionException
     
     # check if version is 2.0
     if rex.group(1) != "2.0":
