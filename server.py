@@ -4,7 +4,7 @@ import time
 import asyncio
 import pySSH.establish as establish
 import pySSH.exceptions as exceptions
-from pySSH.client import Client as Client
+from pySSH.client import ClientBase as ClientBase
 
 class Server:
     def __init__(self, host = 'localhost', port = 22, allowed_authentication_types = ['password','public_key']):
@@ -41,16 +41,53 @@ class Server:
 
         self.sock.close()
 
-    def close_conn(self, client: Client, exception: exceptions.SSHException = None):
+    def close_conn(self, client, exception: exceptions.SSHException = None):
         self.clients[client].send(b'Bye')
         self.clients[client].close()
 
-    """
-    user can use @app.on_startup to add a function to be called when the server is started, it can be null
-    """
+    def Client(self, client_class):
+        """
+        Decarator for client subclasse, client_class must inherit from ClientBase
+        server will create objects of the client_class and pass it to the user,
+        user can use ClientBase methods and attributes in the client_class.
+        
+        
+        Example:
+        from psSSH import pySSH, ClientBase
+
+        app = pySSH()
+
+        @app.Client
+        class MyClient(ClientBase):
+            def __init__(self):
+                super().__init__(self)
+                self.name = super().username
+        """
+        if not issubclass(client_class, ClientBase):
+            raise TypeError("Client class must inherit from ClientBase")
+        self.ClientClass = client_class
+        print(self.ClientClass)
+        return client_class
+
     def event(self, func: callable):
         """
-        Event
+        Decorator for event handlers
+        Example:
+
+        @app.event
+        def on_startup():
+            print("Server started")
+
+        @app.event
+        def on_message(client, data):
+            print("Message from client: " + data.decode())
+            
+        Events:
+        on_startup: called when the server is started, arguments: none
+        on_establish: called when a client is established, arguments: client
+        on_message: called when a client sends a message, arguments: client, data
+        on_leave: called when a client leaves, arguments: client
+        on_shutdown: called when the server is closed, arguments: none
         """
         if not callable(func):
             raise TypeError("on_startup function must be callable")
@@ -81,7 +118,11 @@ class Server:
 
 
         # assume that the client is a valid ssh client and username is client1_username
-        client_obj = Client(self, "client1_username")
+        client_obj = self.ClientClass()
+        print(self.ClientClass)
+        # initialize the clientbase object 
+        
+        client_obj.super().password = "Test1"
         self.clients[client_obj] = client_sock
         self.on_establish(client_obj)
         return

@@ -4,7 +4,7 @@ def select_algorithm(type: str, algorithms: bytes):
     Gerekli algoritmay return eder, eğer algoritma yoksa hata frlatr.
 
     @type: str [kex, host_key, mac, public_key, compression]
-    @algorithms: str
+    @algorithms: bytes
     @return: function
     """
     algorithms = algorithms.decode("utf-8").split(",")
