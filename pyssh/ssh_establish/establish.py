@@ -1,8 +1,12 @@
 import re
-import pySSH.kexinit as kexinit
-from pySSH.exceptions import WrongVersionException
+from . import kexinit
+from pyssh.exceptions import WrongVersionException
+from .server_packets import key_exchange_init_packet
 
 def check_version(client, address):
+    """
+    Checks if the client is a valid ssh client and if it is version 2.0
+    """
     version = client.recv(1024)
     version = version.decode("utf-8")
 
@@ -28,7 +32,16 @@ def check_version(client, address):
     client.send("SSH-2.0-pySSH byEnsarGok\r\n".encode('utf-8'))
     return True
 
+
 def key_exchange_init(client, address):
+    """
+    SSH Message Code: 20
+    SSH Message Name: SSH_MSG_KEXINIT
+    """
+    # send kexinit packet
+    kexinit_packet = key_exchange_init_packet()
+    client.send(kexinit_packet)
+
     data = client.recv(2048)
     packet_length = int.from_bytes(data[0:4], byteorder='big')
     padding_length = int.from_bytes(data[4:5], byteorder='big')
@@ -38,7 +51,6 @@ def key_exchange_init(client, address):
     message_code = int.from_bytes(message_code, byteorder='big')
     if not message_code == 20:  # SSH_MSG_KEXINIT (20)
         raise NotImplementedError
-
-    methods = kexinit.kex_get_methods(payload)  #TODO
-    # server sends kexinit packet
-    #client.send(servers_kexinit_packet)
+    
+    kexinit_packet = kexinit.KexInitPacket(payload)
+    return kexinit_packet

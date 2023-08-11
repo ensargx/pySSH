@@ -5,8 +5,8 @@ sys.path.append("../../")
 
 #from client import Client, server
 
-from pySSH import pySSH
-from pySSH import ClientBase as ClientBase
+from pyssh import pySSH
+from pyssh import ClientBase as ClientBase
 
 app = pySSH()
 
@@ -19,11 +19,8 @@ class Client(ClientBase):
 
     app = pySSH()
 
-    @app.Client
     class MyClient(ClientBase):
         def __init__(self):
-            super().__init__(self)
-            self.name = super().username
                 
     """
     pass
@@ -38,7 +35,7 @@ def on_establish(client: Client):
     print(client.username + " is established")
 
 @app.event
-def on_message(client: Client, data):
+def on_message(client: Client, data: bytes):
     print(data)
 
 @app.event
@@ -56,5 +53,4 @@ if __name__ == '__main__':
         if cmd == "exit":
             app.shutdown()
             break
-    print("Server is closed")
     sys.exit(0)

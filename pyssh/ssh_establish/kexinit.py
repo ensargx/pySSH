@@ -22,7 +22,26 @@ def curve25519_sha256(payload):
     raise NotImplementedError
     return None
 
-def curve25519_sha256_libssh_org(payload):
+def curve25519_sha256_libssh_org(payload: bytes):
+    """
+    Verify that client public key
+    length is 32 bytes.
+    Generate ephemeral key pair.
+    Compute shared secret.
+    Generate and sign exchange hash.
+
+    @payload: bytes
+    @return: bytes
+    """
+
+    # Verify that client public key length is 32 bytes.
+    client_public_key_length = int.from_bytes(payload[0:4], byteorder='big')
+    if client_public_key_length != 32:
+        raise Exception("Client public key length is not 32 bytes")
+    
+    # Generate ephemeral key pair.
+    
+
     print("curve25519_sha256_libssh_org")
     raise NotImplementedError
     return None
@@ -98,6 +117,82 @@ host_key_algorithms = {'rsa-sha2-512': rsa_sha2_512}
 
 
 
+
+
+
+
+# Encryption Algorithm Client to Server
+def chacha20_poly1305_open_ssh(payload):
+    print("chacha20_poly1305_open_ssh")
+    raise NotImplementedError
+    return None
+
+encryption_client_to_server_algorithms = {
+    'chaca': chacha20_poly1305_open_ssh,
+    'aes128-ctr': None,
+}
+
+
+
+# Encryption Algorithm Server to Client 
+def chacha20_poly1305_open_ssh(payload):
+    print("chacha20_poly1305_open_ssh")
+    raise NotImplementedError
+    return None
+
+
+encryption_server_to_client_algorithms = {
+    'chaca': chacha20_poly1305_open_ssh,
+    'aes128-ctr': None,
+}
+
+
+
+# MAC Algorithm Client to Server
+def umac_64_etm_open_ssh(payload):
+    print("umac_64_etm_open_ssh")
+    raise NotImplementedError
+    return None
+
+mac_client_to_server_algorithms = {
+    'umac': umac_64_etm_open_ssh,
+}
+
+
+# MAC Algorithm Server to Client
+
+def umac_64_etm_open_ssh(payload):
+    print("umac_64_etm_open_ssh")
+    raise NotImplementedError
+    return None
+
+mac_server_to_client_algorithms = {
+    'umac': umac_64_etm_open_ssh,
+}
+
+
+# Compression Algorithm Client to Server
+def asdasdasd(payload):
+    print("asdasdasd")
+    raise NotImplementedError
+    return None
+
+compression_client_to_server_algorithms = {
+    'deneme': asdasdasd,
+}
+
+
+# Compression Algorithm Server to Client
+def asdasdasd(payload):
+    print("asdasdasd")
+    raise NotImplementedError
+    return None
+
+compression_server_to_client_algorithms = {
+    'deneme': asdasdasd,
+}
+
+
 def kex_get_methods(payload: bytes):
     """
     Gets the methods from the kexinit message and returns them as a dictionary
@@ -108,43 +203,52 @@ def kex_get_methods(payload: bytes):
 
     kex_algorithms_length = int.from_bytes(payload[end_payload_index:21], byteorder='big')
     kex_algorithms = payload[21:21 + kex_algorithms_length]
-    kex = select_algorithm("kex", kex_algorithms)
+    kex_algorithm = select_algorithm("kex", kex_algorithms)
     end_payload_index += 4 + kex_algorithms_length
 
     server_host_key_algorithms_length = int.from_bytes(payload[end_payload_index:end_payload_index + 4], byteorder='big')
     server_host_key_algorithms = payload[end_payload_index + 4:end_payload_index + 4 + server_host_key_algorithms_length] # truncated
+    server_host_key_algorithm = select_algorithm("host_key", server_host_key_algorithms)
     end_payload_index += 4 + server_host_key_algorithms_length
 
     encryption_algorithms_client_to_server_length = int.from_bytes(payload[end_payload_index:end_payload_index + 4], byteorder='big')
     encryption_algorithms_client_to_server = payload[end_payload_index + 4:end_payload_index + 4 + encryption_algorithms_client_to_server_length] # truncated
+    encryption_algorithm_client_to_server = select_algorithm("encryption_client_to_server", encryption_algorithms_client_to_server)
     end_payload_index += 4 + encryption_algorithms_client_to_server_length
 
     encryption_algorithms_server_to_client_length = int.from_bytes(payload[end_payload_index:end_payload_index + 4], byteorder='big')
     encryption_algorithms_server_to_client = payload[end_payload_index + 4:end_payload_index + 4 + encryption_algorithms_server_to_client_length] # truncated
+    encryption_algorithm_server_to_client = select_algorithm("encryption_server_to_client", encryption_algorithms_server_to_client)
     end_payload_index += 4 + encryption_algorithms_server_to_client_length
 
     mac_algorithms_client_to_server_length = int.from_bytes(payload[end_payload_index:end_payload_index + 4], byteorder='big')
     mac_algorithms_client_to_server = payload[end_payload_index + 4:end_payload_index + 4 + mac_algorithms_client_to_server_length] # truncated
+    mac_algorithm_client_to_server = select_algorithm("mac_client_to_server", mac_algorithms_client_to_server)
     end_payload_index += 4 + mac_algorithms_client_to_server_length
 
     mac_algorithms_server_to_client_length = int.from_bytes(payload[end_payload_index:end_payload_index + 4], byteorder='big')
     mac_algorithms_server_to_client = payload[end_payload_index + 4:end_payload_index + 4 + mac_algorithms_server_to_client_length] # truncated
+    mac_algorithm_server_to_client = select_algorithm("mac_server_to_client", mac_algorithms_server_to_client)
     end_payload_index += 4 + mac_algorithms_server_to_client_length
 
     compression_algorithms_client_to_server_length = int.from_bytes(payload[end_payload_index:end_payload_index + 4], byteorder='big')
     compression_algorithms_client_to_server = payload[end_payload_index + 4:end_payload_index + 4 + compression_algorithms_client_to_server_length] # truncated
+    compression_algorithm_client_to_server = select_algorithm("compression_client_to_server", compression_algorithms_client_to_server)
     end_payload_index += 4 + compression_algorithms_client_to_server_length
 
     compression_algorithms_server_to_client_length = int.from_bytes(payload[end_payload_index:end_payload_index + 4], byteorder='big')
     compression_algorithms_server_to_client = payload[end_payload_index + 4:end_payload_index + 4 + compression_algorithms_server_to_client_length] # truncated
+    compression_algorithm_server_to_client = select_algorithm("compression_server_to_client", compression_algorithms_server_to_client)
     end_payload_index += 4 + compression_algorithms_server_to_client_length
 
     languages_client_to_server_length = int.from_bytes(payload[end_payload_index:end_payload_index + 4], byteorder='big')
     languages_client_to_server = payload[end_payload_index + 4:end_payload_index + 4 + languages_client_to_server_length] # truncated
+    languages_client_to_server = languages_client_to_server.decode("utf-8").split(",")
     end_payload_index += 4 + languages_client_to_server_length
 
     languages_server_to_client_length = int.from_bytes(payload[end_payload_index:end_payload_index + 4], byteorder='big')
     languages_server_to_client = payload[end_payload_index + 4:end_payload_index + 4 + languages_server_to_client_length] # truncated
+    languages_server_to_client = languages_server_to_client.decode("utf-8").split(",")
     end_payload_index += 4 + languages_server_to_client_length
 
     first_kex_packet_follows = payload[end_payload_index:end_payload_index + 1]
@@ -152,4 +256,18 @@ def kex_get_methods(payload: bytes):
 
     reserved = payload[end_payload_index:end_payload_index + 4]
 
-    return {"kex" : "kex"}
+    return {
+        "cookie": cookie,
+        "kex_algorithm": kex_algorithm,
+        "server_host_key_algorithm": server_host_key_algorithm,
+        "encryption_algorithm_client_to_server": encryption_algorithm_client_to_server,
+        "encryption_algorithm_server_to_client": encryption_algorithm_server_to_client,
+        "mac_algorithm_client_to_server": mac_algorithm_client_to_server,
+        "mac_algorithm_server_to_client": mac_algorithm_server_to_client,
+        "compression_algorithm_client_to_server": compression_algorithm_client_to_server,
+        "compression_algorithm_server_to_client": compression_algorithm_server_to_client,
+        "languages_client_to_server": languages_client_to_server,
+        "languages_server_to_client": languages_server_to_client,
+        "first_kex_packet_follows": first_kex_packet_follows,
+        "reserved": reserved
+    }

@@ -1,4 +1,4 @@
-from pySSH.exceptions import WrongVersionException
+from pyssh.exceptions import WrongVersionException
 
 class ClientBase:
     """
@@ -15,9 +15,8 @@ class ClientBase:
 
     Example:
 
-    class MyClient(Client):
+    class MyClient(ClientBase):
         def __init__(self):
-            super().__init__(self)
 
     """
     def __init__(self):

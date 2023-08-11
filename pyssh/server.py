@@ -2,9 +2,9 @@ import socket
 import threading
 import time
 import asyncio
-import pySSH.establish as establish
-import pySSH.exceptions as exceptions
-from pySSH.client import ClientBase as ClientBase
+from pyssh import ssh_establish
+import pyssh.exceptions as exceptions
+from pyssh.client import ClientBase as ClientBase
 
 class Server:
     def __init__(self, host = 'localhost', port = 22, allowed_authentication_types = ['password','public_key']):
@@ -44,30 +44,6 @@ class Server:
     def close_conn(self, client, exception: exceptions.SSHException = None):
         self.clients[client].send(b'Bye')
         self.clients[client].close()
-
-    def Client(self, client_class):
-        """
-        Decarator for client subclasse, client_class must inherit from ClientBase
-        server will create objects of the client_class and pass it to the user,
-        user can use ClientBase methods and attributes in the client_class.
-        
-        
-        Example:
-        from psSSH import pySSH, ClientBase
-
-        app = pySSH()
-
-        @app.Client
-        class MyClient(ClientBase):
-            def __init__(self):
-                super().__init__(self)
-                self.name = super().username
-        """
-        if not issubclass(client_class, ClientBase):
-            raise TypeError("Client class must inherit from ClientBase")
-        self.ClientClass = client_class
-        print(self.ClientClass)
-        return client_class
 
     def event(self, func: callable):
         """
@@ -111,11 +87,33 @@ class Server:
         """
 
         # Check the SSH Version
-        establish.check_version(client_sock, address)
+        if not ssh_establish.check_version(client_sock, address):
+            """
+            Client will not be accepted if it is not a valid ssh client or if it is not version 2.0
+            """
+            client_sock.close()
+            return
 
         # Check the SSH Key Exchange
-        establish.key_exchange_init(client_sock, address)
-
+        KEX_ALGORITHMS = ssh_establish.key_exchange_init(client_sock, address)
+        """
+        KEX_ALGORITHMS =
+        {
+        "cookie": cookie,
+        "kex_algorithm": kex_algorithm,
+        "server_host_key_algorithm": server_host_key_algorithm,
+        "encryption_algorithm_client_to_server": encryption_algorithm_client_to_server,
+        "encryption_algorithm_server_to_client": encryption_algorithm_server_to_client,
+        "mac_algorithm_client_to_server": mac_algorithm_client_to_server,
+        "mac_algorithm_server_to_client": mac_algorithm_server_to_client,
+        "compression_algorithm_client_to_server": compression_algorithm_client_to_server,
+        "compression_algorithm_server_to_client": compression_algorithm_server_to_client,
+        "languages_client_to_server": languages_client_to_server,
+        "languages_server_to_client": languages_server_to_client,
+        "first_kex_packet_follows": first_kex_packet_follows,
+        "reserved": reserved
+        }
+        """
 
         # assume that the client is a valid ssh client and username is client1_username
         client_obj = self.ClientClass()
