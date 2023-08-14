@@ -40,7 +40,51 @@ def curve25519_sha256_libssh_org(payload: bytes):
         raise Exception("Client public key length is not 32 bytes")
     
     # Generate ephemeral key pair.
+    import secrets
+    ephemeral_private_key = secrets.token_bytes(32)
+
+    # Extract client's public key from the payload.
+    client_public_key = payload[4:4 + client_public_key_length]
+
+    # Perform Curve25519 key exchange.
+    shared_secret = curve25519_shared_secret(ephemeral_private_key, client_public_key)
+
+    # Generate and sign the exchange hash.
+    import hashlib
+    exchange_hash = hashlib.sha256(shared_secret).digest()
+    signature = sign_exchange_hash(ephemeral_private_key, exchange_hash)
+
+    # Construct the response message.
+    response = (
+        b'\x00\x00\x00\x20' +  # Server's public key length (32 bytes)
+        ephemeral_private_key +  # Server's ephemeral public key
+        signature  # Signature of the exchange hash
+    )
+
+    return response
     
+def curve25519_shared_secret(private_key, public_key):
+    """
+    Perform Curve25519 key exchange.
+
+    @private_key: bytes
+    @public_key: bytes
+    @return: bytes
+    """
+    import curve25519
+    return curve25519.shared(private_key, public_key)
+
+def sign_exchange_hash(private_key, exchange_hash):
+    """
+    Sign the exchange hash.
+
+    @private_key: bytes
+    @exchange_hash: bytes
+    @return: bytes
+    """
+    import ed25519
+    signing_key = ed25519.SigningKey(private_key)
+    return signing_key.sign(exchange_hash)
 
     print("curve25519_sha256_libssh_org")
     raise NotImplementedError
