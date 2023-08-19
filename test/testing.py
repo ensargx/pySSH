@@ -10,7 +10,6 @@ from pyssh import ClientBase as ClientBase
 
 app = pySSH()
 
-@app.Client
 class Client(ClientBase):
     """
     Example:
