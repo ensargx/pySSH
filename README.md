@@ -3,6 +3,8 @@
 
 Hey, I am trying to make an SSH server with Python. It will be costumizable and easy to use. I am still working on it. I will add more features soon. If you want to help me, you can fork this repository and make a pull request. I will be happy to see your contributions.
 
+Feel free give me feedbacks and suggestions.
+
 ```python
 from pyssh import pySSH
 from pyssh import ClientBase
