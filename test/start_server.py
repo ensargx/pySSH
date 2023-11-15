@@ -22,13 +22,14 @@ def main():
 
     print("Protocol version exchange succeeded.")
 
-    # Get data from client
-    cts_key_exchange_init = pyssh._core._core_classes._core_packet(client.recv(4096))
-
-    # Send data to client
-    server_kex_init = pyssh._core._core_classes._core_packet._create_packet(cts_key_exchange_init.payload)
+    server_kex_init = pyssh._core._packets._default_packets._get_key_exchange_init()
+    server_kex_init = pyssh._core._core_classes._core_packet._create_packet(server_kex_init)
     print("Sending server_kex_init:\n", server_kex_init)
     client.send(bytes(server_kex_init))
+
+    # Get data from client
+    cts_key_exchange_init = pyssh._core._core_classes._core_packet(client.recv(4096))
+    print("Received cts_key_exchange_init:\n", cts_key_exchange_init)
 
     print()
 

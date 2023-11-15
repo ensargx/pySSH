@@ -115,7 +115,7 @@ class _core_packet:   # TODO: Add try-except for struct.unpack, and raise NotImp
     @staticmethod
     def _create_packet(_payload, _mac = b""):
         """
-        Creates a packet from given data.
+        Creates a packet from given payload.
         """
         _len_payload = len(_payload) + 1 # +1 for padding_length
         
