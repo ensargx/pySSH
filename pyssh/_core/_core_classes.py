@@ -112,3 +112,25 @@ class _core_packet:   # TODO: Add try-except for struct.unpack, and raise NotImp
     def __len__(self):
         return len(bytes(self))
     
+    @staticmethod
+    def _create_packet(_payload, _mac = b""):
+        """
+        Creates a packet from given data.
+        """
+        _len_payload = len(_payload) + 1 # +1 for padding_length
+        
+        # _len_payload + 4 + _len_random_padding = MUST be a multiple
+        # of the cipher block size or 8, whichever is larger 
+
+        _len_random_padding = 8 - (_len_payload + 4) % 8
+        if _len_random_padding < 4:
+            _len_random_padding += 8
+
+        _padding_length = _len_random_padding
+        _packet_length = _len_payload + _len_random_padding
+
+        _random_padding = b"0" * _len_random_padding
+
+        _packet = _core_packet(_packet_length.to_bytes(4, byteorder="big") + _padding_length.to_bytes(1, byteorder="big") + _payload + _random_padding + _mac)
+        return _packet
+
