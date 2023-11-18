@@ -5,6 +5,8 @@ pySSHbanner = b"SSH-2.0-pySSH_" + __version__.encode("utf-8") + b" byEnsarGok" +
 def _get_pyssh_banner():
     return pySSHbanner
 
+_key_exchange_init = None
+
 def _get_key_exchange_init():
     """
     Key exchange begins by each side sending the following packet:
@@ -158,6 +160,9 @@ def _get_key_exchange_init():
     arbitrary number of messages that may be in-flight before receiving a
     SSH_MSG_KEXINIT message from the other party.
     """
+    if globals().get("_key_exchange_init") is not None:
+        return _key_exchange_init
+
     _payload = b"\x14"
 
     import os
@@ -203,4 +208,5 @@ def _get_key_exchange_init():
 
     _payload += b"\x00\x00\x00\x00" # reserved for future extension
 
+    globals()["_key_exchange_init"] = _payload
     return _payload

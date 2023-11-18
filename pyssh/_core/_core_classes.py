@@ -129,7 +129,7 @@ class _core_packet:   # TODO: Add try-except for struct.unpack, and raise NotImp
         _padding_length = _len_random_padding
         _packet_length = _len_payload + _len_random_padding
 
-        _random_padding = b"0" * _len_random_padding
+        _random_padding = b"\0" * _len_random_padding
 
         _packet = _core_packet(_packet_length.to_bytes(4, byteorder="big") + _padding_length.to_bytes(1, byteorder="big") + _payload + _random_padding + _mac)
         return _packet
