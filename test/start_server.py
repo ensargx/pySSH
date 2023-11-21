@@ -11,15 +11,15 @@ def sign_with_key(data):
     with open("/tmp/data", "wb") as f:
         f.write(data)
 
-    os.system('ssh-keygen -Y sign -f /home/ensargok/keys/id_rsa -n file /tmp/data')
+    os.system('openssl dgst -sha1 -sign /tmp/id_rsa.pem -out /tmp/signature.bin /tmp/data')
 
-    with open("/tmp/data.sig", "rb") as f:
-        data = f.read()
+    with open("/tmp/signature.bin", "rb") as f:
+        signature = f.read()
 
     os.system("rm /tmp/data")
-    os.system("rm /tmp/data.sig")
+    os.system("rm /tmp/signature.bin")
 
-    return data
+    return signature
 
 def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -131,8 +131,6 @@ def main():
 
     # s = sign(H)
     # sign = pyssh._core._crypto._signing._signing()
-    s = sign_with_key(H)
-
     len_ks = len(K_S).to_bytes(4, byteorder="big")
 
     id_rsa_pub_b64 = "AAAAB3NzaC1yc2EAAAADAQABAAABgQDghTrs2T3N3vQfyUwAmAra+pj6+ZVvRkaFyc2XqeoAIfD597U8HMeICBREOaPlC+ezEGgbyp9N1adbYWiaAfxkAN23NlTqbxsKppeD7H1wdtBdKg/aOjwHP4F8C5ebZCKzDZys9QUTvFqv6cLrsZRuGGTGVtDqWtCS70Y4mCS2TZoi7n50IVBba+C/4mHUL0uStjTlkdnGj2WtZ11F0KmUhy1anzO+7V32ucesXWMdXc+HQPFhUi3DSEfsn21EWbtweTMMx/mN0UU/372ZupPYQK4N1WJgvkcO+9+uxQA1XRMyB6GGf0N4XbmURE/zC3nLI1anWNlBluZa6e0nccqK4dzEKFaPgqnlskZkOv+5q/fcap1q7z99cwTcq9Mslyj57qFfZS1OyUe8OPdv5o7C5lo1ZH66YZ09TbvY9++q4cK5+YsQQKoD8eh3F8NIlIl9AHhH9na7xUxolMxAvvV2M5XclxL1WZ7oWW/wOQ9Ybqyn+Z+lruk8s+FljZyEq/s="
@@ -141,9 +139,16 @@ def main():
     
     payload = b"\x1F" + id_rsa_len + id_rsa_byte + mpint_f
 
-    signature = sign_with_key(H) 
+    # KEX host signature for rsa
+
+
+    signature = sign_with_key(H)
     len_s = len(signature).to_bytes(4, byteorder="big")
-    payload += len_s + signature
+    host_sign_type = b"ssh-rsa"
+    len_host_sign_type = len(host_sign_type).to_bytes(4, byteorder="big")
+    host_sign_len = len(signature) + len(host_sign_type) + 8
+    host_sign_len = host_sign_len.to_bytes(4, "big")
+    payload += host_sign_len + len_host_sign_type + host_sign_type + len_s + signature
 
     payload = pyssh._core._core_classes._core_packet._create_packet(payload)
     client.send(bytes(payload))
