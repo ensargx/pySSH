@@ -1,5 +1,6 @@
 import socket
 import pyssh
+import base64
 
 import hashlib
 def sha1(data):
@@ -134,7 +135,15 @@ def main():
 
     len_ks = len(K_S).to_bytes(4, byteorder="big")
 
-    payload = b"\x1F" + len_ks + K_S + bytes_f + s
+    id_rsa_pub_b64 = "AAAAB3NzaC1yc2EAAAADAQABAAABgQDghTrs2T3N3vQfyUwAmAra+pj6+ZVvRkaFyc2XqeoAIfD597U8HMeICBREOaPlC+ezEGgbyp9N1adbYWiaAfxkAN23NlTqbxsKppeD7H1wdtBdKg/aOjwHP4F8C5ebZCKzDZys9QUTvFqv6cLrsZRuGGTGVtDqWtCS70Y4mCS2TZoi7n50IVBba+C/4mHUL0uStjTlkdnGj2WtZ11F0KmUhy1anzO+7V32ucesXWMdXc+HQPFhUi3DSEfsn21EWbtweTMMx/mN0UU/372ZupPYQK4N1WJgvkcO+9+uxQA1XRMyB6GGf0N4XbmURE/zC3nLI1anWNlBluZa6e0nccqK4dzEKFaPgqnlskZkOv+5q/fcap1q7z99cwTcq9Mslyj57qFfZS1OyUe8OPdv5o7C5lo1ZH66YZ09TbvY9++q4cK5+YsQQKoD8eh3F8NIlIl9AHhH9na7xUxolMxAvvV2M5XclxL1WZ7oWW/wOQ9Ybqyn+Z+lruk8s+FljZyEq/s="
+    id_rsa_byte = base64.b64decode(id_rsa_pub_b64)
+    id_rsa_len = len(id_rsa_byte).to_bytes(4, byteorder="big")
+    
+    payload = b"\x1F" + id_rsa_len + id_rsa_byte + mpint_f
+
+    signature = sign_with_key(H) 
+    len_s = len(signature).to_bytes(4, byteorder="big")
+    payload += len_s + signature
 
     payload = pyssh._core._core_classes._core_packet._create_packet(payload)
     client.send(bytes(payload))
