@@ -17,7 +17,7 @@ def sign_hash(data):
     return pkcs1_15.new(private_key).sign(SHA1.new(data))
 
 
-def mpint(x):
+def mpint(x: int):
     len_x = x.bit_length() // 8 + 1
     return len_x.to_bytes(4, byteorder="big") + x.to_bytes(len_x, byteorder="big")
 
