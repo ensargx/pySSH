@@ -177,27 +177,27 @@ def _get_key_exchange_init():
     _payload += len(algorithms).to_bytes(4, byteorder="big") # server_host_key_algorithms length
     _payload += algorithms
 
-    algorithms += b"3des-cbc,aes128-cbc,aes192-cbc,aes256-cbc,aes128-ctr,aes192-ctr,aes256-ctr"
+    algorithms = b"3des-cbc,aes128-cbc,aes192-cbc,aes256-cbc,aes128-ctr,aes192-ctr,aes256-ctr"
     _payload += len(algorithms).to_bytes(4, byteorder="big") # encryption_algorithms_client_to_server length
     _payload += algorithms
 
-    algorithms += b"3des-cbc,aes128-cbc,aes192-cbc,aes256-cbc,aes128-ctr,aes192-ctr,aes256-ctr"
+    algorithms = b"3des-cbc,aes128-cbc,aes192-cbc,aes256-cbc,aes128-ctr,aes192-ctr,aes256-ctr"
     _payload += len(algorithms).to_bytes(4, byteorder="big") # encryption_algorithms_server_to_client length
     _payload += algorithms
 
-    algorithms += b"umac-64-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha1-etm@openssh.com,umac-64@openssh.com,umac-128@openssh.com,hmac-sha2-256,hmac-sha2-512,hmac-sha1"
+    algorithms = b"umac-64-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha1-etm@openssh.com,umac-64@openssh.com,umac-128@openssh.com,hmac-sha2-256,hmac-sha2-512,hmac-sha1"
     _payload += len(algorithms).to_bytes(4, byteorder="big") # mac_algorithms_client_to_server length
     _payload += algorithms
 
-    algorithms += b"umac-64-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha1-etm@openssh.com,umac-64@openssh.com,umac-128@openssh.com,hmac-sha2-256,hmac-sha2-512,hmac-sha1"
+    algorithms = b"umac-64-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha1-etm@openssh.com,umac-64@openssh.com,umac-128@openssh.com,hmac-sha2-256,hmac-sha2-512,hmac-sha1"
     _payload += len(algorithms).to_bytes(4, byteorder="big") # mac_algorithms_server_to_client length
     _payload += algorithms
 
-    algorithms += b"none,zlib"
+    algorithms = b"none,zlib"
     _payload += len(algorithms).to_bytes(4, byteorder="big") # compression_algorithms_client_to_server length
     _payload += algorithms
 
-    algorithms += b"none,zlib"
+    algorithms = b"none,zlib"
     _payload += len(algorithms).to_bytes(4, byteorder="big") # compression_algorithms_server_to_client length
     _payload += algorithms
 

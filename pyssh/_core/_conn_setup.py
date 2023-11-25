@@ -7,7 +7,7 @@ import gzip
 #                                                                               #
 #################################################################################
 
-def _protocol_version_exchange(data: bytes) -> bool:
+def _protocol_version_exchange(data: bytes) -> bytes:
     """
     When the connection has been established, both sides MUST send an
     identification string.  This identification string MUST be
@@ -76,7 +76,9 @@ def _protocol_version_exchange(data: bytes) -> bool:
     if rex.group(1) != "2.0":
         raise NotImplementedError("what to do after if version is not 2.0")
     
-    return True
+    # return the version string
+    return rex.string.encode('utf-8')
+    
 
 #################################################################################
 #                                                                               #

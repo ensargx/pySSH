@@ -1,9 +1,37 @@
 import socket
 import pyssh
+import base64
+
+from pyssh._core._util import mpint, string, byte
 
 import hashlib
 def sha1(data):
     return hashlib.sha1(data).digest()
+
+from Crypto.Signature import pkcs1_15
+from Crypto.Hash import SHA1
+from Crypto.PublicKey import RSA
+
+private_key = RSA.import_key(open("/home/ensargok/keys/id_rsa.pem").read())
+public_key = RSA.import_key(open("/home/ensargok/keys/id_rsa.pub").read())
+
+def hash_and_sign(data):
+    return pkcs1_15.new(private_key).sign(SHA1.new(data))
+
+import os
+def sign_with_key(data):
+    with open("/tmp/data", "wb") as f:
+        f.write(data)
+
+    os.system('openssl dgst -sha1 -sign /tmp/id_rsa.pem -out /tmp/signature.bin /tmp/data')
+
+    with open("/tmp/signature.bin", "rb") as f:
+        signature = f.read()
+
+    os.system("rm /tmp/data")
+    os.system("rm /tmp/signature.bin")
+
+    return signature
 
 def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -21,7 +49,8 @@ def main():
 
     # Get data from client
     client_string = client.recv(1024)
-    if not pyssh._core._conn_setup._protocol_version_exchange(client_string):
+    client_string = pyssh._core._conn_setup._protocol_version_exchange(client_string)
+    if not client_string:
         print("Protocol version exchange failed.")
 
     server_kex_init = pyssh._core._packets._default_packets._get_key_exchange_init()
@@ -66,12 +95,15 @@ def main():
     ]
     dh_g14_sha1_prime = "".join(dh_g14_sha1_prime)
     dh_g14_sha1_prime = int(dh_g14_sha1_prime.replace(" ", ""), 16)
+    assert dh_g14_sha1_prime == 32317006071311007300338913926423828248817941241140239112842009751400741706634354222619689417363569347117901737909704191754605873209195028853758986185622153212175412514901774520270235796078236248884246189477587641105928646099411723245426622522193230540919037680524235519125679715870117001058055877651038861847280257976054903569732561526167081339361799541336476559160368317896729073178384589680639671900977202194168647225871031411336429319536193471636533209717077448227988588565369208645296636077250268955505928362751121174096972998068410554359584866583291642136218231078990999448652468262416972035911852507045361090559
     dh_g14_sha1_generator = 2
-
+    dh_g14_sha1_q = (dh_g14_sha1_prime - 1) // 2
+    
 
     # Get data from client
     dh_g14_sha1 = pyssh._core._core_classes._core_packet(client.recv(4096))
     massage_code = dh_g14_sha1.payload[0] # should be 30
+    assert massage_code == 30
     multi_precision_integer_len = int.from_bytes(dh_g14_sha1.payload[1:5], byteorder="big")
     ch_client_e = int.from_bytes(dh_g14_sha1.payload[5:5+multi_precision_integer_len], byteorder="big")
 
@@ -90,37 +122,58 @@ def main():
     second hashing operation.
     """
     y = 0x1234567890abcdef
+    assert 0 < y < dh_g14_sha1_q
     ch_server_f = pow(dh_g14_sha1_generator, y, dh_g14_sha1_prime)
-    
     K = pow(ch_client_e, y, dh_g14_sha1_prime)
-    V_C = b"SSH-2.0-OpenSSH_for_Windows_8.1"
-    V_S = b"SSH-2.0-pySSH_0.1"
-    # servers public key = K_S
-    public_key = b"2d2d2d2d2d424547494e205055424c4943204b45592d2d2d2d2d0a4d494942496a414e42676b71686b6947397730424151454641414f43415138414d49494243674b434151454174587559545744503575514d43526c54745441730a6b4d6a77766c56694a586a45786a373376626a6b30454f586351704964482f79494b616253464a552f46434c4970444d4d4d547644414c4d6a7a485566564c370a30494b79362f453450327478707435516f6c46766d2f5a50726a4d627a764a70506e6c3654757a306c496d556e684742576e365876554870736d4c6e2f392f550a7454546b78467a4f574d6a4d4d33434577585248386d6862636152572b716b6b4d52555241616f76755557714747376c654c323175586468746d54744b4844670a76437464374d6e3338636c572b65343250666f32736b457173376451694963367769364b6a50524d4a362f6b2f52576b737065346c514e4939714a6d763550560a6e45726943504c4d2f61734877397654773243556c78746c67593764344d382b4c744b30627a6846616c2f4834314d576834516e49725942486c4e77474d6c640a63514944415141420a2d2d2d2d2d454e44205055424c4943204b45592d2d2d2d2d0a"
-    certificate = b"2d2d2d2d2d424547494e2043455254494649434154452d2d2d2d2d0a4d494944745443434170304346415453515247644a315a4e66476c7255546d4d68585669755648334d413047435371475349623344514542437755414d4947570a4d517377435159445651514745774a55556a45554d424947413155454341774c7734544373484e3059573569645777784644415342674e564241634d43384f450a7772427a64474675596e56734d524577447759445651514b44416846626e4e68636b6476617a45524d41384741315545437777495257357a59584a48623273780a4554415042674e5642414d4d4345567563324679523239724d5349774941594a4b6f5a496876634e41516b4246684e6c626e4e68636e686e623274415a3231680a61577775593239744d4234584454497a4d5445784e7a457a4e446b794e316f58445449304d5445784e6a457a4e446b794e316f77675a5978437a414a42674e560a42415954416c52534d525177456759445651514944417644684d4b7763335268626d4a31624445554d424947413155454277774c7734544373484e30595735690a645777784554415042674e5642416f4d4345567563324679523239724d524577447759445651514c44416846626e4e68636b6476617a45524d413847413155450a417777495257357a59584a4862327378496a416742676b71686b694739773042435145574532567563324679654764766130426e625746706243356a623230770a676745694d4130474353714753496233445145424151554141344942447741776767454b416f4942415143316535684e594d2f6d3541774a47564f314d4379510a7950432b5657496c654d544750766539754f545151356478436b6830662f496770707449556c5438554973696b4d7777784f384d417379504d645239557676510a67724c723854672f6133476d336c436955572b62396b2b754d78764f386d6b2b6558704f37505355695a5365455946616670653951656d795975662f333953310a4e4f5445584d3559794d777a63495442644566796146747870466236715351784652454271692b3552616f596275563476625735643247325a4f306f634f43380a4b3133737966667879566235376a59392b6a61795153717a74314349687a72434c6f714d3945776e722b5439466153796c37695641306a326f6d612f6b3957630a5375494938737a397177664432395044594a5358473257426a7433677a7a3475307252764f4556715838666a55786148684363697467456555334159795631780a41674d42414145774451594a4b6f5a496876634e4151454c425141446767454241466e394b794278345579572f65415a4b3159575663423774397a4f456231590a4b544634444f695a754b7a5846524f5136374f6d72674d5150307178476b7971475a7847446b796a537a4a44506859774a41476553563063457a50765550712f0a744a43587832733236652b55696b7536575357627274362f33305a7352545447727830324f4a4d444c594a567056446e41456b6351614c6f2f63692f536b73780a656c55746547724f526169784c45543961414356314636766b44386434376b7a5a547461715a762b4c41552f416c7246594a5365514a56566d746b4b4b2b31510a4b552f4b42414e4e4a48472b353252413759345656556241652b686777584c6561627a526650305a72514436716c4e3572714478784b33366c7179694d4b2b310a2f6b7464654b57686d727863667259706a312f7a786c51484f6c534f4f676b676f2b2f545456545136756665314b426c68417a674146773d0a2d2d2d2d2d454e442043455254494649434154452d2d2d2d2d0a"
-    K_S = public_key
+    I_C = string(client_kex_init.payload)
+    I_S = string(server_kex_init.payload)
+    K_S = b"AAAAB3NzaC1yc2EAAAADAQABAAABgQDghTrs2T3N3vQfyUwAmAra+pj6+ZVvRkaFyc2XqeoAIfD597U8HMeICBREOaPlC+ezEGgbyp9N1adbYWiaAfxkAN23NlTqbxsKppeD7H1wdtBdKg/aOjwHP4F8C5ebZCKzDZys9QUTvFqv6cLrsZRuGGTGVtDqWtCS70Y4mCS2TZoi7n50IVBba+C/4mHUL0uStjTlkdnGj2WtZ11F0KmUhy1anzO+7V32ucesXWMdXc+HQPFhUi3DSEfsn21EWbtweTMMx/mN0UU/372ZupPYQK4N1WJgvkcO+9+uxQA1XRMyB6GGf0N4XbmURE/zC3nLI1anWNlBluZa6e0nccqK4dzEKFaPgqnlskZkOv+5q/fcap1q7z99cwTcq9Mslyj57qFfZS1OyUe8OPdv5o7C5lo1ZH66YZ09TbvY9++q4cK5+YsQQKoD8eh3F8NIlIl9AHhH9na7xUxolMxAvvV2M5XclxL1WZ7oWW/wOQ9Ybqyn+Z+lruk8s+FljZyEq/s="
+    K_S = base64.b64decode(K_S) # IDK if this is true or not. Should I add [4:] ? ...
 
-    len_e = ch_client_e.bit_length() // 8 + 1
-    mpint_e = len_e.to_bytes(4, byteorder="big") + ch_client_e.to_bytes(len_e, byteorder="big")
+    K_S = string("ssh-rsa") + mpint(public_key.e) + mpint(public_key.n)
+    K_S = string(K_S)
+    # print(K_S == K_S1)
 
-    len_f = ch_server_f.bit_length() // 8 + 1
-    mpint_f = len_f.to_bytes(4, byteorder="big") + ch_server_f.to_bytes(len_f, byteorder="big")
+    V_C = string(client_string.rstrip(b"\r\n"))
+    V_S = string(b"SSH-2.0-pySSH_0.1 byEnsarGok")
+    mpint_e = mpint(ch_client_e)
+    mpint_f = mpint(ch_server_f)
+    mpint_k = mpint(K)
 
-    len_k = K.bit_length() // 8 + 1
-    byte_k = K.to_bytes(len_k, byteorder="big")
-    H = sha1(V_C + V_S + client_kex_init.payload + server_kex_init.payload + K_S + mpint_e + mpint_f + byte_k)
+    id_rsa_byte = b"\x00\x00\x00\x07" + b"ssh-rsa" + mpint(public_key.e) + mpint(public_key.n)
+    id_rsa_len = len(id_rsa_byte).to_bytes(4, byteorder="big")
 
-    payload = b"\x1E"
-    payload += public_key + certificate
-    # len_f = len(ch_server_f).to_bytes(4, byteorder="big")
-    len_f = ch_server_f.bit_length() // 8 + 1
-    bytes_f = ch_server_f.to_bytes(len_f, byteorder="big")
+    # H = hash(V_C || V_S || I_C || I_S || K_S || e || f || K)
+    H = sha1(V_C + V_S + I_C + I_S + K_S + mpint_e + mpint_f + mpint_k)
 
-    payload += len_f.to_bytes(4, byteorder="big") + bytes_f
-    payload += H
+    # s = sign(H)
+    # sign = pyssh._core._crypto._signing._signing()
 
-    packet = pyssh._core._core_classes._core_packet._create_packet(payload)
-    client.send(bytes(packet))
+    payload = b"\x1F" + id_rsa_len + id_rsa_byte + mpint_f
+
+    signature1 = sign_with_key(H)
+    rsa_signature = hash_and_sign(V_C + V_S + I_C + I_S + K_S + mpint_e + mpint_f + mpint_k)
+
+    rsa_signature = signature1
+
+    print(signature1 == rsa_signature)
+    len_s = len(rsa_signature).to_bytes(4, byteorder="big")
+
+    host_sign_type = b"ssh-rsa"
+    len_host_sign_type = len(host_sign_type).to_bytes(4, byteorder="big")
+
+    host_sign_len = len(rsa_signature) + len(host_sign_type) + 8
+    host_sign_len = host_sign_len.to_bytes(4, "big")
+    payload += host_sign_len + len_host_sign_type + host_sign_type + len_s + rsa_signature
+
+    payload = pyssh._core._core_classes._core_packet._create_packet(payload)
+    client.send(bytes(payload))
+
+    msg_new_keys = byte(0x15)
+    client.send(pyssh._core._core_classes._core_packet._create_packet(msg_new_keys))
+
+    data = pyssh._core._core_classes._core_packet(client.recv(4096))
+
 
     print()
 
