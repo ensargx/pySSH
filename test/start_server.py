@@ -2,6 +2,8 @@ import socket
 import pyssh
 import base64
 
+from pyssh._core._util import mpint, string, byte
+
 import hashlib
 def sha1(data):
     return hashlib.sha1(data).digest()
@@ -13,13 +15,8 @@ from Crypto.PublicKey import RSA
 private_key = RSA.import_key(open("/home/ensargok/keys/id_rsa.pem").read())
 public_key = RSA.import_key(open("/home/ensargok/keys/id_rsa.pub").read())
 
-def sign_hash(data):
+def hash_and_sign(data):
     return pkcs1_15.new(private_key).sign(SHA1.new(data))
-
-
-def mpint(x: int):
-    len_x = x.bit_length() // 8 + 1
-    return len_x.to_bytes(4, byteorder="big") + x.to_bytes(len_x, byteorder="big")
 
 import os
 def sign_with_key(data):
@@ -52,7 +49,8 @@ def main():
 
     # Get data from client
     client_string = client.recv(1024)
-    if not pyssh._core._conn_setup._protocol_version_exchange(client_string):
+    client_string = pyssh._core._conn_setup._protocol_version_exchange(client_string)
+    if not client_string:
         print("Protocol version exchange failed.")
 
     server_kex_init = pyssh._core._packets._default_packets._get_key_exchange_init()
@@ -127,32 +125,37 @@ def main():
     assert 0 < y < dh_g14_sha1_q
     ch_server_f = pow(dh_g14_sha1_generator, y, dh_g14_sha1_prime)
     K = pow(ch_client_e, y, dh_g14_sha1_prime)
-    I_C = bytes(dh_g14_sha1)
-    I_C = client_kex_init.payload
-    I_S = bytes(server_kex_init)
-    I_S = server_kex_init.payload
+    I_C = string(client_kex_init.payload)
+    I_S = string(server_kex_init.payload)
     K_S = b"AAAAB3NzaC1yc2EAAAADAQABAAABgQDghTrs2T3N3vQfyUwAmAra+pj6+ZVvRkaFyc2XqeoAIfD597U8HMeICBREOaPlC+ezEGgbyp9N1adbYWiaAfxkAN23NlTqbxsKppeD7H1wdtBdKg/aOjwHP4F8C5ebZCKzDZys9QUTvFqv6cLrsZRuGGTGVtDqWtCS70Y4mCS2TZoi7n50IVBba+C/4mHUL0uStjTlkdnGj2WtZ11F0KmUhy1anzO+7V32ucesXWMdXc+HQPFhUi3DSEfsn21EWbtweTMMx/mN0UU/372ZupPYQK4N1WJgvkcO+9+uxQA1XRMyB6GGf0N4XbmURE/zC3nLI1anWNlBluZa6e0nccqK4dzEKFaPgqnlskZkOv+5q/fcap1q7z99cwTcq9Mslyj57qFfZS1OyUe8OPdv5o7C5lo1ZH66YZ09TbvY9++q4cK5+YsQQKoD8eh3F8NIlIl9AHhH9na7xUxolMxAvvV2M5XclxL1WZ7oWW/wOQ9Ybqyn+Z+lruk8s+FljZyEq/s="
-    K_S = base64.b64decode(K_S)
-    # servers public key = K_S
-    V_C = b"SSH-2.0-OpenSSH_for_Windows_8.1"
-    V_S = b"SSH-2.0-pySSH_0.1 byEnsarGok"
+    K_S = base64.b64decode(K_S) # IDK if this is true or not. Should I add [4:] ? ...
+
+    K_S = string("ssh-rsa") + mpint(public_key.e) + mpint(public_key.n)
+    K_S = string(K_S)
+    # print(K_S == K_S1)
+
+    V_C = string(client_string.rstrip(b"\r\n"))
+    V_S = string(b"SSH-2.0-pySSH_0.1 byEnsarGok")
     mpint_e = mpint(ch_client_e)
     mpint_f = mpint(ch_server_f)
     mpint_k = mpint(K)
+
+    id_rsa_byte = b"\x00\x00\x00\x07" + b"ssh-rsa" + mpint(public_key.e) + mpint(public_key.n)
+    id_rsa_len = len(id_rsa_byte).to_bytes(4, byteorder="big")
+
     # H = hash(V_C || V_S || I_C || I_S || K_S || e || f || K)
     H = sha1(V_C + V_S + I_C + I_S + K_S + mpint_e + mpint_f + mpint_k)
 
     # s = sign(H)
     # sign = pyssh._core._crypto._signing._signing()
 
-    id_rsa_pub_b64 = "AAAAB3NzaC1yc2EAAAADAQABAAABgQDghTrs2T3N3vQfyUwAmAra+pj6+ZVvRkaFyc2XqeoAIfD597U8HMeICBREOaPlC+ezEGgbyp9N1adbYWiaAfxkAN23NlTqbxsKppeD7H1wdtBdKg/aOjwHP4F8C5ebZCKzDZys9QUTvFqv6cLrsZRuGGTGVtDqWtCS70Y4mCS2TZoi7n50IVBba+C/4mHUL0uStjTlkdnGj2WtZ11F0KmUhy1anzO+7V32ucesXWMdXc+HQPFhUi3DSEfsn21EWbtweTMMx/mN0UU/372ZupPYQK4N1WJgvkcO+9+uxQA1XRMyB6GGf0N4XbmURE/zC3nLI1anWNlBluZa6e0nccqK4dzEKFaPgqnlskZkOv+5q/fcap1q7z99cwTcq9Mslyj57qFfZS1OyUe8OPdv5o7C5lo1ZH66YZ09TbvY9++q4cK5+YsQQKoD8eh3F8NIlIl9AHhH9na7xUxolMxAvvV2M5XclxL1WZ7oWW/wOQ9Ybqyn+Z+lruk8s+FljZyEq/s="
-    id_rsa_byte = base64.b64decode(id_rsa_pub_b64)
-    id_rsa_len = len(id_rsa_byte).to_bytes(4, byteorder="big")
-    
     payload = b"\x1F" + id_rsa_len + id_rsa_byte + mpint_f
 
     signature1 = sign_with_key(H)
-    rsa_signature = sign_hash(H)
+    rsa_signature = hash_and_sign(V_C + V_S + I_C + I_S + K_S + mpint_e + mpint_f + mpint_k)
+
+    rsa_signature = signature1
+
     print(signature1 == rsa_signature)
     len_s = len(rsa_signature).to_bytes(4, byteorder="big")
 
@@ -165,6 +168,12 @@ def main():
 
     payload = pyssh._core._core_classes._core_packet._create_packet(payload)
     client.send(bytes(payload))
+
+    msg_new_keys = byte(0x15)
+    client.send(pyssh._core._core_classes._core_packet._create_packet(msg_new_keys))
+
+    data = pyssh._core._core_classes._core_packet(client.recv(4096))
+
 
     print()
 
