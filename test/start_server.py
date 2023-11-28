@@ -4,6 +4,10 @@ import base64
 
 from pyssh._core._util import mpint, string, byte
 
+from cryptography.hazmat.primitives.ciphers import algorithms
+from cryptography.hazmat.primitives.ciphers import Cipher, modes
+from cryptography.hazmat.backends import default_backend
+
 import hashlib
 def sha1(data):
     return hashlib.sha1(data).digest()
@@ -32,6 +36,12 @@ def sign_with_key(data):
     os.system("rm /tmp/signature.bin")
 
     return signature
+
+def decrypt_aes128_ctr_with_rsa(data, symetric_key, private_key: RSA.RsaKey):
+    cipher = Cipher(algorithms.AES(symetric_key), modes.CTR(b'\x00' * 16), backend=default_backend())
+    decryptor = cipher.decryptor()
+    decrypted_data = decryptor.update(data) + decryptor.finalize()
+    return decrypted_data
 
 def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -169,12 +179,28 @@ def main():
     payload = pyssh._core._core_classes._core_packet._create_packet(payload)
     client.send(bytes(payload))
 
-    msg_new_keys = byte(0x15)
-    client.send(pyssh._core._core_classes._core_packet._create_packet(msg_new_keys))
+    msg_new_keys = pyssh._core._core_classes._core_packet._create_packet(byte(0x15))
+    client.send(bytes(msg_new_keys))
 
-    data = pyssh._core._core_classes._core_packet(client.recv(4096))
+    data = client.recv(4096)
 
+    """
+        K1 = HASH(K || H || X || session_id)   (X is e.g., "A")
+        K2 = HASH(K || H || K1)
+        K3 = HASH(K || H || K1 || K2)
+        ...
+        key = K1 || K2 || K3 || ...
 
+    This process will lose entropy if the amount of entropy in K is
+    larger than the internal state size of HASH.
+    """
+    entrophy = K.to_bytes(256, byteorder="big")
+    key = sha1(mpint_k + H + b"A" + session_id)
+    session_id = K
+    while len(entrophy) < 256:
+        entrophy += sha1(entrophy + session_id)
+
+    print(test)
     print()
 
 
