@@ -6,8 +6,8 @@ class Reader:
     """
     Class to decode a payload into data types
     """
-    def __init__(self, message: Message):
-        self.message = message
+    def __init__(self, message: bytes):
+        self._message = message
         self.idx = 0
         self.len = len(bytes(message))
 
@@ -27,7 +27,7 @@ class Reader:
             -deadbeef          00 00 00 05 ff 21 52 41 11
         """
         l = self.read_uint32()
-        x = self.message[self.idx:self.idx+l]
+        x = self._message[self.idx:self.idx+l]
         self.idx += l
         return int.from_bytes(x, byteorder="big", signed=signed)
 
@@ -39,7 +39,7 @@ class Reader:
         """
         if self.idx + 4 > self.len:
             raise ValueError("Not enough bytes to read uint32")
-        val = int.from_bytes(self.message[self.idx:self.idx+4], byteorder="big", signed=False)
+        val = int.from_bytes(self._message[self.idx:self.idx+4], byteorder="big", signed=False)
         self.idx += 4
         return val
 
@@ -50,11 +50,11 @@ class Reader:
         """
         if self.idx + 8 > self.len:
             raise ValueError("Not enough bytes to read uint64")
-        val = int.from_bytes(self.message[self.idx:self.idx+8], byteorder="big", signed=False)
+        val = int.from_bytes(self._message[self.idx:self.idx+8], byteorder="big", signed=False)
         self.idx += 8
         return val
     
-    def string(self) -> bytes:
+    def read_string(self) -> bytes:
         """
         Represents an arbitrary length binary string.  Strings are allowed
         to contain arbitrary binary data, including null characters and
@@ -65,11 +65,11 @@ class Reader:
         """
         l = self.read_uint32()
         assert self.idx + l <= self.len, "Not enough bytes to read string"
-        val = self.message[self.idx:self.idx+l]
+        val = self._message[self.idx:self.idx+l]
         self.idx += l
         return val
     
-    def name_list(self) -> List[bytes]:
+    def read_name_list(self) -> List[bytes]:
         """
         Represents an arbitrary length name string.  Strings are allowed
         to contain arbitrary binary data, including null characters and
@@ -80,6 +80,48 @@ class Reader:
         """
         l = self.read_uint32()
         assert self.idx + l <= self.len, "Not enough bytes to read name list"
-        val = self.message[self.idx:self.idx+l]
+        val = self._message[self.idx:self.idx+l]
         self.idx += l
-        return List(val.split(b","))
+        return list(val.split(b","))
+
+    def read_byte(self) -> bytes:
+        """
+        Represents an arbitrary length binary string.  Strings are allowed
+        to contain arbitrary binary data, including null characters and
+        8-bit characters.  They are stored as a uint32 containing its
+        length (number of bytes that follow) and zero (= empty string) or
+        more bytes that are the value of the string.  Terminating null
+        characters are not used.
+        """
+        assert self.idx + 1 <= self.len, "Not enough bytes to read byte"
+        val = self._message[self.idx]
+        self.idx += 1
+        return val
+
+    def read_bytes(self, n: int) -> bytes:
+        """
+        Represents an arbitrary length binary string.  Strings are allowed
+        to contain arbitrary binary data, including null characters and
+        8-bit characters.  They are stored as a uint32 containing its
+        length (number of bytes that follow) and zero (= empty string) or
+        more bytes that are the value of the string.  Terminating null
+        characters are not used.
+        """
+        assert self.idx + n <= self.len, "Not enough bytes to read bytes"
+        val = self._message[self.idx:self.idx+n]
+        self.idx += n
+        return val
+    
+    def read_boolean(self) -> bool:
+        """
+        Represents a boolean.  The value FALSE is represented by the
+        byte value 0, and the value TRUE by the byte value 1.
+        """
+        val = self.read_byte()
+        if val == b"\x00":
+            return False
+        return True
+
+    @property
+    def message(self):
+        return self._message
