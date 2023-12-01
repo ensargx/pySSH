@@ -1,26 +1,22 @@
 import secrets
-from typing import Protocol
+from abc import ABC, abstractmethod
 from ..hash import Hash
 from dataclasses import dataclass
 
 
-class DiffieHellman(Protocol):
-    def generate_y(self):
-        pass
+class DiffieHellman(ABC):
+    name: bytes
+    hash_name: bytes
+    g: int
+    p: int
+    q: int
+    hash_func: Hash
 
-    def compute_f(self):
+    def __init__(self):
         pass
-
-    def compute_k(self):
-        pass
-
-    def receive_e(self, e: int):
-        pass
-
-    def generate_h(self, data: bytes):
-        pass
-
-    def hash(self, data: bytes):
+    
+    @abstractmethod
+    def hash(data: bytes):
         pass
 
 @dataclass
@@ -63,7 +59,7 @@ class DHGroup1SHA1:
         self.h = self.hash_func(data)
         return self.h
 
-class DHGroup14SHA1:
+class DHGroup14SHA1(DiffieHellman):
     """Diffie-Hellman Group 14 Key Exchange with SHA-1"""
     name = b'diffie-hellman-group14-sha1'
     p = int(
@@ -82,27 +78,11 @@ class DHGroup14SHA1:
     q = (p - 1) // 2
     hash_func = Hash.SHA1
 
-    def __init__(self):
-        self.h = None
-    
-    def generate_y(self):
-        self.y = secrets.randbelow(DHGroup1SHA1.q - 1) + 1
-        return self.y
-    
-    def compute_f(self):
-        self.f = pow(DHGroup1SHA1.g, self.y, DHGroup1SHA1.p)
-        return self.f
-
-    def compute_k(self):
-        self.k = pow(self.e, self.y, DHGroup1SHA1.p)
-        return self.k
-
-    def generate_h(self, data: bytes):
-        self.h = DHGroup14SHA1.hash_func(data)
-        return self.h
-    
-    def receive_e(self, e: int):
+    def __init__(self, e: int):
         self.e = e
+        self.y = secrets.randbelow(DHGroup1SHA1.q - 1) + 1
+        self.f = pow(DHGroup1SHA1.g, self.y, DHGroup1SHA1.p)
+        self.k = pow(self.e, self.y, DHGroup1SHA1.p)
 
     @staticmethod
     def hash(data: bytes):

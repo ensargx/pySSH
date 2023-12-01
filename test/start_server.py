@@ -75,7 +75,7 @@ def main():
     data = client.recv(4096)
     client_kex_init = pyssh._core._core_classes._core_packet(data)
     client_kex_init2 = pyssh._core._core_classes._core_packet(data)
-    client_kex_init_2 = pyssh._core.Reader(client_kex_init2.payload)
+    client_kex_init_2 = Reader(client_kex_init2.payload)
     SSH_MSG_KEXINIT = client_kex_init_2.read_byte()
     assert SSH_MSG_KEXINIT == 20
     cookie = client_kex_init_2.read_bytes(16)
@@ -95,24 +95,19 @@ def main():
     for algorithm in kex_algorithms:
         if algorithm == b"diffie-hellman-group14-sha1":
             print("diffie-hellman-group14-sha1")
-            kex_algorithm = kex.DHGroup14SHA1()
             break
 
 
 
     # Get DH_G14_SHA1 from client
     dh_g14_sha1 = pyssh._core._core_classes._core_packet(client.recv(4096))
-    dh_g14_sha1 = pyssh._core.Reader(dh_g14_sha1.payload)
+    dh_g14_sha1 = Reader(dh_g14_sha1.payload)
     SSH_MSG_KEXDH_INIT = dh_g14_sha1.read_byte()
     assert SSH_MSG_KEXDH_INIT == 30
     client_dh_e = dh_g14_sha1.read_mpint()
 
 
-
-    kex_algorithm.generate_y()
-    kex_algorithm.receive_e(client_dh_e)
-    f = kex_algorithm.compute_f()
-    k = kex_algorithm.compute_k()
+    kex_algorithm = kex.DHGroup14SHA1(client_dh_e)
     server_host_key = string("ssh-rsa") + mpint(public_key.e) + mpint(public_key.n)
     concat = \
         string(client_banner.rstrip(b'\r\n')) + \
@@ -121,17 +116,17 @@ def main():
         string(server_kex_init.payload) + \
         string(server_host_key) + \
         mpint(client_dh_e) + \
-        mpint(f) + \
-        mpint(k)
+        mpint(kex_algorithm.f) + \
+        mpint(kex_algorithm.k)
     
-    H = kex_algorithm.generate_h(concat)
+    H = kex_algorithm.hash(concat)
     sign = sign_with_key(H)
     signature = string("ssh-rsa") + string(sign)
 
     server_dh_response = Message()
     server_dh_response.write_byte(31) # SSH_MSG_KEXDH_REPLY
     server_dh_response.write_string(server_host_key)
-    server_dh_response.write_mpint(f)
+    server_dh_response.write_mpint(kex_algorithm.f)
     server_dh_response.write_string(signature)    
 
     server_dh_response = pyssh._core._core_classes._core_packet._create_packet(server_dh_response.payload)
