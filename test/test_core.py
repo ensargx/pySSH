@@ -2,6 +2,7 @@ import unittest
 
 from pyssh._core import _conn_setup, _core_classes, _packets
 
+
 # TEST _conn_setup_version_exchange
 
 class test__client_base(unittest.TestCase):

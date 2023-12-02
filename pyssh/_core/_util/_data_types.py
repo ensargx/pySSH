@@ -1,3 +1,6 @@
+from typing import List, Tuple, Union
+
+
 def mpint(x: int, signed: bool = True) -> bytes:
     """
     Represents multiple precision integers in two's complement format,
@@ -22,6 +25,10 @@ def mpint(x: int, signed: bool = True) -> bytes:
         -1234              00 00 00 02 ed cc
         -deadbeef          00 00 00 05 ff 21 52 41 11
     """
+
+    # Check if x is bytes
+    if isinstance(x, bytes):
+        x = int.from_bytes(x, byteorder='big', signed=signed)
 
     # Get the absolute value of x
     abs_x = abs(x)
@@ -56,14 +63,45 @@ def uint32(x: int) -> bytes:
       order of decreasing significance (network byte order).  For
       example: the value 699921578 (0x29b7f4aa) is stored as 29 b7 f4 aa.
     """
-    return x.to_bytes(4, byteorder='big')
+    return x.to_bytes(4, byteorder='big', signed=False)
 
 def uint64(x: int) -> bytes:
     """
     Represents a 64-bit unsigned integer.  Stored as eight bytes in
     the order of decreasing significance (network byte order).
     """
-    return x.to_bytes(8, byteorder='big')
+    return x.to_bytes(8, byteorder='big', signed=False)
+
+def int32(x: int) -> bytes:
+    """
+    Represents a 32-bit signed integer.  Stored as four bytes in the
+    order of decreasing significance (network byte order).  Positive
+    numbers have the value 0x80000000 as the most significant byte of
+    the data partition.  Negative numbers have the value 0x7fffffff as
+    the most significant byte of the data partition.  For example: the
+    value -1 is stored as ff ff ff ff.
+    """
+    return x.to_bytes(4, byteorder='big', signed=True)
+
+def int64(x: int) -> bytes:
+    """
+    Represents a 64-bit signed integer.  Stored as eight bytes in the
+    order of decreasing significance (network byte order).  Positive
+    numbers have the value 0x8000000000000000 as the most significant
+    byte of the data partition.  Negative numbers have the value
+    0x7fffffffffffffff as the most significant byte of the data
+    partition.
+    """
+    return x.to_bytes(8, byteorder='big', signed=True)
+
+def boolean(x: bool) -> bytes:
+    """
+    Represents a boolean.  The value FALSE is represented by the byte
+    value 0x00 and the value TRUE is represented by the byte value 0x01.
+    """
+    if x:
+        return b'\x01'
+    return b'\x00'
 
 def string(z: bytes) -> bytes:
     """
@@ -86,7 +124,7 @@ def string(z: bytes) -> bytes:
         return length_bytes + z.encode('utf-8')
     return length_bytes + z
 
-def name_list(l: list) -> bytes:
+def name_list(l: List[bytes] | Tuple[bytes]) -> bytes:
     """
     A string containing a comma-separated list of names.  A name-list
     is represented as a uint32 containing its length (number of bytes
@@ -119,4 +157,4 @@ def byte(x: int = 0) -> bytes:
     """
     Represents an 8-bit unsigned number.  Stored as a single byte.
     """
-    return x.to_bytes(1, byteorder='big')
+    return x.to_bytes(1, byteorder='big', signed=False)
