@@ -1,6 +1,7 @@
 import unittest
 
-from pyssh._core import _conn_setup, _core_classes, _packets
+from pyssh._core import _core_classes, _packets
+from pyssh._core._packets import _conn_setup
 
 
 # TEST _conn_setup_version_exchange

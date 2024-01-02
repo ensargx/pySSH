@@ -3,6 +3,7 @@ import pyssh
 import base64
 
 from pyssh._core import kex
+from pyssh._core.client import Client
 
 from pyssh._core._util import mpint, string, byte
 
@@ -10,7 +11,6 @@ from cryptography.hazmat.primitives.ciphers import algorithms
 from cryptography.hazmat.primitives.ciphers import Cipher, modes
 from cryptography.hazmat.backends import default_backend
 
-from pyssh._core.hash import Hash
 from pyssh._core import Message
 from pyssh._core import Reader
 
@@ -26,6 +26,10 @@ def hash_and_sign(data):
 
 def sign_with_rsa(data):
     return pkcs1_15.new(private_key).sign(data)
+
+def sign_sha1_with_rsa(data: bytes, key_file: str):
+    key = RSA.import_key(open(key_file).read())
+    return pkcs1_15.new(key).sign(SHA1.new(data))
 
 import os
 def sign_with_key(data):
@@ -57,6 +61,9 @@ def main():
     print('Listening at', sock.getsockname())
     client, addr = sock.accept()
     print('Connection from', addr)
+    client_ =  Client(client)
+
+    print()
 
     # Send data to client
     server_banner = pyssh._core._packets._default_packets._get_pyssh_banner()
@@ -102,11 +109,22 @@ def main():
     # Get DH_G14_SHA1 from client
     dh_g14_sha1 = pyssh._core._core_classes._core_packet(client.recv(4096))
     dh_g14_sha1 = Reader(dh_g14_sha1.payload)
-    SSH_MSG_KEXDH_INIT = dh_g14_sha1.read_byte()
-    assert SSH_MSG_KEXDH_INIT == 30
+    MESSAGE_CODE = dh_g14_sha1.read_byte()
+
+    if MESSAGE_CODE == 30:
+        print("SSH_MSG_KEXDH_INIT")
+    elif MESSAGE_CODE == 31:
+        print("SSH_MSG_KEXDH_REPLY")
+    elif MESSAGE_CODE == 32:
+        print("SSH_MSG_KEX_DH_GEX_INIT")
+    elif MESSAGE_CODE == 33:
+        print("SSH_MSG_KEX_DH_GEX_REQUEST")
+    elif MESSAGE_CODE == 34:
+        print("SSH_MSG_KEX_DH_GEX_GROUP")
+    elif MESSAGE_CODE == 35:
+        print("SSH_MSG_KEX_DH_GEX_INIT")
+
     client_dh_e = dh_g14_sha1.read_mpint()
-
-
     kex_algorithm = kex.DHGroup14SHA1(client_dh_e)
     server_host_key = string("ssh-rsa") + mpint(public_key.e) + mpint(public_key.n)
     concat = \
@@ -119,9 +137,19 @@ def main():
         mpint(kex_algorithm.f) + \
         mpint(kex_algorithm.k)
     
-    H = kex_algorithm.hash(concat)
+    H = kex_algorithm.hash(concat).digest()
     sign = sign_with_key(H)
     signature = string("ssh-rsa") + string(sign)
+
+    """
+    from pyssh._core import hostkey
+    test_host_key = hostkey.RSAKey("/home/ensargok/keys/id_rsa.pub", "/home/ensargok/keys/id_rsa.pem")
+    test_sign = test_host_key.signature(kex_algorithm.hash(concat))
+    """
+    test_sign = sign_sha1_with_rsa(H, "/home/ensargok/keys/id_rsa.pem")
+    test_sign = string("ssh-rsa") + string(test_sign)
+
+    print( test_sign == signature )
 
     server_dh_response = Message()
     server_dh_response.write_byte(31) # SSH_MSG_KEXDH_REPLY

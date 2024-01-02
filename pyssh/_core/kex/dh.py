@@ -1,10 +1,25 @@
 import secrets
-from ..hash import Hash
+# from ..hash import Hash
 
+from Crypto.Hash import SHA1
+from Crypto.Hash.SHA1 import SHA1Hash
 
 class DHGroup1SHA1:
-    ...
+    """Diffie-Hellman Group 1 Key Exchange with SHA-1"""
+    name = b'diffie-hellman-group1-sha1'
+    p = 179769313486231590770839156793787453197860296048756011706444423684197180216158519368947833795864925541502180565485980503646440548199239100050792877003355816639229553136239076508735759914822574862575007425302077447712589550957937778424442426617334727629299387668709205606050270810842907692932019128194467627007
+    g = 2
+    q = 89884656743115795385419578396893726598930148024378005853222211842098590108079259684473916897932462770751090282742990251823220274099619550025396438501677908319614776568119538254367879957411287431287503712651038723856294775478968889212221213308667363814649693834354602803025135405421453846466009564097233813503
 
+    def __init__(self, e: int):
+        self.e = e
+        self.y = secrets.randbelow(self.q - 1) + 1
+        self.f = pow(self.g, self.y, self.p)
+        self.k = pow(self.e, self.y, self.p)
+
+    @staticmethod
+    def hash(data: bytes) -> SHA1Hash:
+        return SHA1.new(data)
 
 class DHGroup14SHA1:
     """Diffie-Hellman Group 14 Key Exchange with SHA-1"""
@@ -15,10 +30,10 @@ class DHGroup14SHA1:
 
     def __init__(self, e: int):
         self.e = e
-        self.y = secrets.randbelow(DHGroup14SHA1.q)
+        self.y = secrets.randbelow(self.q - 1) + 1
         self.f = pow(self.g, self.y, self.p)
         self.k = pow(self.e, self.y, self.p)
 
     @staticmethod
-    def hash(data: bytes):
-        return Hash.SHA1(data)
+    def hash(data: bytes) -> SHA1Hash:
+        return SHA1.new(data)
