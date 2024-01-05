@@ -5,7 +5,7 @@ from Crypto.PublicKey import RSA
 
 from Crypto.Signature import pkcs1_15
 
-from Crypto.Hash import SHA1
+from Crypto.Hash import SHA1, SHA256
 
 # class RSAKey(HostKey):
 class RSAKey:
@@ -32,5 +32,10 @@ class RSAKey:
 
     def sign_sha1(self, data: bytes) -> bytes:
         signature = self._pkcs1_15.sign(SHA1.new(data))
+        signature = string("ssh-rsa") + string(signature)
+        return signature
+    
+    def sign_sha256(self, data: bytes) -> bytes:
+        signature = self._pkcs1_15.sign(SHA256.new(data))
         signature = string("ssh-rsa") + string(signature)
         return signature

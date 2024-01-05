@@ -51,16 +51,6 @@ class Client:
         packet = _core_packet._create_packet(data)
         self.client_sock.send(bytes(packet))
 
-    def select_kex_algorithm(self, kex_algorithms: list):
-        print("NOT FULLY IMPLEMENTED: CLİENT.SELECT_KEX_ALGORITHM")
-        for algorithm in kex_algorithms:
-            if algorithm == b"diffie-hellman-group14-sha1":
-                return kex.DHGroup14SHA1
-            elif algorithm == b"diffie-hellman-group1-sha1":
-                return kex.DHGroup1SHA1
-            else:
-                raise NotImplementedError(f"{algorithm} is not implemented.")
-
     def setup_connection(self, *args, **kwargs):
         self.client_sock.send(self.server_banner)
         
@@ -75,10 +65,9 @@ class Client:
         self.client_sock.send(bytes(server_kex_init))
         server_kex_init = Reader(server_kex_init.payload)
 
-        return self.key_exchange(server_kex_init=server_kex_init, client_banner=client_banner, *args, **kwargs)
+        return self.key_exchange_init(server_kex_init=server_kex_init, client_banner=client_banner, *args, **kwargs)
 
-
-    def key_exchange(self, *args, **kwargs):
+    def key_exchange_init(self, *args, **kwargs):
         client_kex_init = self.client_sock.recv(4096)
         client_kex_init = _core_packet(client_kex_init)
         client_kex_init = Reader(client_kex_init.payload)
@@ -100,13 +89,14 @@ class Client:
         first_kex_packet_follows = client_kex_init.read_boolean()
         reserved = client_kex_init.read_uint32()
 
-        selected_kex_algorithm = self.select_kex_algorithm(kex_algorithms)
-        self.kex_algorithm = selected_kex_algorithm
-
         # TODO : IMPLEMENT HOST KEY STUFF...
+        print("HOST KEY STUFF: IMPLEMENT ME")
         from pyssh._core.hostkey import RSAKey
         host_key = RSAKey("/home/ensargok/keys/id_rsa.pub", "/home/ensargok/keys/id_rsa.pem")
         self.host_key = host_key
+
+        kex_algorithm = kex.select_algorithm(self, kex_algorithms)
+        kex_algorithm.protocol(self, client_kex_init=client_kex_init, *args, **kwargs)
 
         return self.diffie_hellman(client_kex_init=client_kex_init, *args, **kwargs)
 

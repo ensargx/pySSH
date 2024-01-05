@@ -61,7 +61,7 @@ def main():
     print('Listening at', sock.getsockname())
     client, addr = sock.accept()
     print('Connection from', addr)
-    client_ =  Client(client)
+    client_ = Client(client)
 
     print()
 
@@ -126,7 +126,7 @@ def main():
 
     client_dh_e = dh_g14_sha1.read_mpint()
     kex_algorithm = kex.DHGroup14SHA1(client_dh_e)
-    server_host_key = string("ssh-rsa") + mpint(public_key.e) + mpint(public_key.n)
+    server_host_key = string(b"ssh-rsa") + mpint(public_key.e) + mpint(public_key.n)
     concat = \
         string(client_banner.rstrip(b'\r\n')) + \
         string(server_banner.rstrip(b'\r\n')) + \
@@ -139,7 +139,7 @@ def main():
     
     H = kex_algorithm.hash(concat).digest()
     sign = sign_with_key(H)
-    signature = string("ssh-rsa") + string(sign)
+    signature = string(b"ssh-rsa") + string(sign)
 
     """
     from pyssh._core import hostkey
@@ -147,7 +147,7 @@ def main():
     test_sign = test_host_key.signature(kex_algorithm.hash(concat))
     """
     test_sign = sign_sha1_with_rsa(H, "/home/ensargok/keys/id_rsa.pem")
-    test_sign = string("ssh-rsa") + string(test_sign)
+    test_sign = string(b"ssh-rsa") + string(test_sign)
 
     print( test_sign == signature )
 
