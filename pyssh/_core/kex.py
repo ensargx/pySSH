@@ -66,7 +66,7 @@ class DHGroup1SHA1:
             
             hash_h = dh_g1.hash(concat)
             client.exchange_hash = hash_h.digest()
-            signature = client.host_key.sign_sha1(client.exchange_hash)
+            signature = client.host_key.sign(client.exchange_hash)
 
             reply = Message()
             reply.write_byte(31)
@@ -117,7 +117,7 @@ class DHGroup14SHA1:
             
             hash_h = dh_g1.hash(concat)
             client.exchange_hash = hash_h.digest()
-            signature = client.host_key.sign_sha1(client.exchange_hash)
+            signature = client.host_key.sign(client.exchange_hash)
 
             reply = Message()
             reply.write_byte(31)
@@ -163,6 +163,9 @@ class ECDHcurve25519SHA256:
             if len(Q_C) != 32:
                 raise ValueError("Invalid Q_C length")
             
+            # Convert Q_C to X25519PublicKey
+            peer_public_key = x25519.X25519PublicKey.from_public_bytes(Q_C)
+
             # Generate 32 bytes of random data
             private_key = x25519.X25519PrivateKey.generate()
             public_key = private_key.public_key()
@@ -175,15 +178,13 @@ class ECDHcurve25519SHA256:
             )
 
             # Convert public key to bytes
-            public_bytes = public_key.public_bytes(
+            Q_S = public_key.public_bytes(
                 encoding=serialization.Encoding.Raw,
                 format=serialization.PublicFormat.Raw
             )
-
-            # Convert Q_C to X25519PublicKey
-            peer_public_key = x25519.X25519PublicKey.from_public_bytes(Q_C)
             
-            shared_key = private_key.exchange(peer_public_key)
+            shared_key_K = private_key.exchange(peer_public_key)
+            shared_key_K = int.from_bytes(shared_key_K, byteorder='big')
 
             concat = \
                 string(client.client_banner.rstrip(b'\r\n')) + \
@@ -191,61 +192,22 @@ class ECDHcurve25519SHA256:
                 string(client_kex_init.message) + \
                 string(server_kex_init.message) + \
                 string(client.host_key.get_key()) + \
-                string(public_bytes) + \
                 string(Q_C) + \
-                string(shared_key)
-            
+                string(Q_S) + \
+                mpint(shared_key_K)
+
             hash_h = ECDHcurve25519SHA256.hash(concat)
             client.exchange_hash = hash_h.digest()
-            signature = client.host_key.sign_sha256(client.exchange_hash)
+            signature = client.host_key.sign(client.exchange_hash)
 
             reply = Message()
             reply.write_byte(31)
             reply.write_string(client.host_key.get_key())
-            reply.write_string(public_bytes)
+            reply.write_string(Q_S)
             reply.write_string(signature)
 
+            client.send(reply)
 
-            ## TEST VECTOR
-            private_a_bytes = 0x77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a
-            private_a_bytes = private_a_bytes.to_bytes(32, byteorder='big')
-            # generate public key from private key
-            private_a = x25519.X25519PrivateKey.from_private_bytes(private_a_bytes)
-            public_a = private_a.public_key()
-            public_a_bytes = public_a.public_bytes(
-                encoding=serialization.Encoding.Raw,
-                format=serialization.PublicFormat.Raw
-            )
-            # convert public key to bytes
-            a_pub = 0x8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a
-            a_pub = a_pub.to_bytes(32, byteorder='big')
-            assert public_a_bytes == a_pub
-
-            private_b_bytes = 0x5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb
-            # generate public key from private key
-            private_b_bytes = private_b_bytes.to_bytes(32, byteorder='big')
-            private_b = x25519.X25519PrivateKey.from_private_bytes(private_b_bytes)
-            public_b = private_b.public_key()
-            public_b_bytes = public_b.public_bytes(
-                encoding=serialization.Encoding.Raw,
-                format=serialization.PublicFormat.Raw
-            )
-            # convert public key to bytes
-            b_pub = 0xde9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f
-            b_pub = b_pub.to_bytes(32, byteorder='big')
-            assert public_b_bytes == b_pub
-
-            # generate shared key from private key and public key
-            shared_key = private_a.exchange(public_b)
-            # convert shared key to bytes
-            shared_key_bytes = 0x4a5d9d5ba4ce2de1728e3bf480350f25e07e21c947d19e3376f09b3c1e161742
-            shared_key_bytes = shared_key_bytes.to_bytes(32, byteorder='big')
-            assert shared_key_bytes == shared_key
-            
-
-            
-
-            
     @staticmethod
     def hash(data: bytes) -> SHA256Hash:
         return SHA256.new(data)

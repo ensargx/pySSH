@@ -30,6 +30,11 @@ class RSAKey:
     def get_key(self):
         return string("ssh-rsa") + mpint(self.public_key.e) + mpint(self.public_key.n)
 
+    def sign(self, data: bytes) -> bytes:
+        signature = self._pkcs1_15.sign(SHA1.new(data))
+        signature = string("ssh-rsa") + string(signature)
+        return signature
+
     def sign_sha1(self, data: bytes) -> bytes:
         signature = self._pkcs1_15.sign(SHA1.new(data))
         signature = string("ssh-rsa") + string(signature)
