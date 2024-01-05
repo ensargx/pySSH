@@ -169,7 +169,7 @@ def _get_key_exchange_init():
     _payload += os.urandom(16) # cookie
     del os
 
-    algorithms = b"diffie-hellman-group1-sha1,diffie-hellman-group14-sha1"
+    algorithms = b"curve25519-sha256,diffie-hellman-group1-sha1,diffie-hellman-group14-sha1,diffie-hellman-group-exchange-sha1"
     _payload += len(algorithms).to_bytes(4, byteorder="big") # kex_algorithms length
     _payload += algorithms
 
