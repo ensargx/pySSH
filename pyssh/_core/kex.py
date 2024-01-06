@@ -17,11 +17,17 @@ from Crypto.Hash.SHA256 import SHA256Hash
 from typing import List, Protocol
 
 class KeyExchange(Protocol):
-
     @staticmethod
     def protocol(client: Client, *args, **kwargs):
         """
         Key Exchange Protocol
+        """
+        pass
+
+    @property
+    def K(self):
+        """
+        Shared Secret Key
         """
         pass
 
@@ -76,6 +82,13 @@ class DHGroup1SHA1:
 
             client.send(reply)
 
+    @property
+    def K(self):
+        """
+        Shared Secret Key
+        """
+        return self.k
+
 class DHGroup14SHA1:
     """Diffie-Hellman Group 14 Key Exchange with SHA-1"""
     name = b'diffie-hellman-group14-sha1'
@@ -127,19 +140,46 @@ class DHGroup14SHA1:
 
             client.send(reply)
 
+    @property
+    def K(self):
+        """
+        Shared Secret Key
+        """
+        return self.k
+
 class ECDHcurve25519SHA256:
     """Elliptic Curve Diffie-Hellman Curve25519 Key Exchange with SHA-256
     
     RFC7748#6.1
-    
     """
-    def __init__(self) -> None:
-        self.private_key = None
-        self.private_bytes = None
-        self.public_key = None
-        self.public_bytes = None
-        self.shared_key = None
+    def __init__(self, Q_C) -> None:
+        if len(Q_C) != 32:
+            raise ValueError("Invalid Q_C length")
+        self.Q_C = Q_C
+
+        # Convert Q_C to X25519PublicKey
+        self.peer_public_key = x25519.X25519PublicKey.from_public_bytes(Q_C)
+
+        # Generate 32 bytes of random data
+        self.private_key = x25519.X25519PrivateKey.generate()
+        self.public_key = self.private_key.public_key()
         
+        # Convert private key to bytes
+        self.private_bytes = self.private_key.private_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PrivateFormat.Raw,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+
+        # Convert public key to bytes
+        self.Q_S = self.public_key.public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw
+        )
+
+        self.shared_key_K = self.private_key.exchange(self.peer_public_key)
+        self.shared_key_K = int.from_bytes(self.shared_key_K, byteorder='big')
+
     
     @staticmethod
     def protocol(client: Client, client_kex_init: Reader, server_kex_init: Reader, *args, **kwargs):
@@ -163,28 +203,7 @@ class ECDHcurve25519SHA256:
             if len(Q_C) != 32:
                 raise ValueError("Invalid Q_C length")
             
-            # Convert Q_C to X25519PublicKey
-            peer_public_key = x25519.X25519PublicKey.from_public_bytes(Q_C)
-
-            # Generate 32 bytes of random data
-            private_key = x25519.X25519PrivateKey.generate()
-            public_key = private_key.public_key()
-
-            # Convert private key to bytes
-            private_bytes = private_key.private_bytes(
-                encoding=serialization.Encoding.Raw,
-                format=serialization.PrivateFormat.Raw,
-                encryption_algorithm=serialization.NoEncryption()
-            )
-
-            # Convert public key to bytes
-            Q_S = public_key.public_bytes(
-                encoding=serialization.Encoding.Raw,
-                format=serialization.PublicFormat.Raw
-            )
-            
-            shared_key_K = private_key.exchange(peer_public_key)
-            shared_key_K = int.from_bytes(shared_key_K, byteorder='big')
+            curve25519 = ECDHcurve25519SHA256(Q_C)
 
             concat = \
                 string(client.client_banner.rstrip(b'\r\n')) + \
@@ -192,21 +211,36 @@ class ECDHcurve25519SHA256:
                 string(client_kex_init.message) + \
                 string(server_kex_init.message) + \
                 string(client.host_key.get_key()) + \
-                string(Q_C) + \
-                string(Q_S) + \
-                mpint(shared_key_K)
+                string(curve25519.Q_C) + \
+                string(curve25519.Q_S) + \
+                mpint(curve25519.shared_key_K)
 
-            hash_h = ECDHcurve25519SHA256.hash(concat)
+            hash_h = curve25519.hash(concat)
             client.exchange_hash = hash_h.digest()
             signature = client.host_key.sign(client.exchange_hash)
 
             reply = Message()
             reply.write_byte(31)
             reply.write_string(client.host_key.get_key())
-            reply.write_string(Q_S)
+            reply.write_string(curve25519.Q_S)
             reply.write_string(signature)
 
-            client.send(reply)
+            reply_new_keys = Message()
+            reply_new_keys.write_byte(21)
+
+            client.send(reply, reply_new_keys)
+
+            new_keys = client.recv()
+            
+            if new_keys.read_byte() != 21:
+                raise ValueError("Invalid message code")
+
+    @property
+    def K(self):
+        """
+        Shared Secret Key
+        """
+        return self.shared_key_K
 
     @staticmethod
     def hash(data: bytes) -> SHA256Hash:

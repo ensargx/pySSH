@@ -36,7 +36,8 @@ class Client:
         data = _core_packet(data)
         return Reader(data.payload)
     
-    def send(self, message: Message, *args, **kwargs):
+    def send(self, *messages: Message, **kwargs):
+        """
         data = message.payload
 
         if self.encryption is not None:
@@ -50,6 +51,27 @@ class Client:
 
         packet = _core_packet._create_packet(data)
         self.client_sock.send(bytes(packet))
+        """
+
+        raw_data = b''
+        # For each message in messages:
+        for message in messages:
+            data = message.payload
+
+            if self.encryption is not None:
+                data = self.encryption.encrypt(data, **kwargs)
+
+            if self.mac is not None:
+                self.mac.sign(data, **kwargs)
+
+            if self.compression is not None:
+                data = self.compression.compress(data, **kwargs)
+
+            packet = _core_packet._create_packet(data, **kwargs)
+            raw_data += bytes(packet)
+
+        self.client_sock.send(raw_data)
+
 
     def setup_connection(self, *args, **kwargs):
         self.client_sock.send(self.server_banner)
@@ -98,8 +120,15 @@ class Client:
         kex_algorithm = kex.select_algorithm(self, kex_algorithms)
         kex_algorithm.protocol(self, client_kex_init=client_kex_init, *args, **kwargs)
 
-        return self.diffie_hellman(client_kex_init=client_kex_init, *args, **kwargs)
-
+        return self.loop(*args, **kwargs)
+    
+    def loop(self, *args, **kwargs):
+        """
+        Client loop.
+        """
+        pass
+    
+    """ 
     # if kex message code is 30:
     def client_dh_g_1_14_sha1(self, message: Reader, *args, **kwargs):
         e = message.read_mpint()
@@ -147,4 +176,4 @@ class Client:
             raise NotImplementedError("omg not implemented")
         elif message_code == 34:
             return self.client_dh_group_exchange(client_dh_init, *args, **kwargs)
-
+    """
