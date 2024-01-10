@@ -1,6 +1,6 @@
 import unittest
 
-from pyssh._core._util import mpint, name_list
+from pyssh.util import mpint, name_list
 
 class test__mpint(unittest.TestCase):
     def test__mpint(self):

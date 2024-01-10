@@ -1,5 +1,5 @@
 from .hostkey import HostKey
-from pyssh._core._util import mpint, string, byte
+from pyssh.util import mpint, string, byte
 
 from Crypto.PublicKey import RSA
 

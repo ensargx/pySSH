@@ -2,8 +2,9 @@ import secrets
 
 from .message import Message
 from .reader import Reader
-from .client import Client
-from ._util import mpint, string, byte
+from pyssh.util import mpint, string, byte
+
+### TODO: import client ...
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import x25519
@@ -18,7 +19,7 @@ from typing import List, Protocol
 
 class KeyExchange(Protocol):
     @staticmethod
-    def protocol(client: Client, *args, **kwargs):
+    def protocol(client, *args, **kwargs):
         """
         Key Exchange Protocol
         """
@@ -49,7 +50,7 @@ class DHGroup1SHA1:
         return SHA1.new(data)
     
     @staticmethod
-    def protocol(client: Client, client_kex_init: Reader, server_kex_init: Reader, *args, **kwargs):
+    def protocol(client, client_kex_init: Reader, server_kex_init: Reader, *args, **kwargs):
         """
         Diffie-Hellman Group 1 Key Exchange with SHA-1 Protocol
         """
@@ -107,7 +108,7 @@ class DHGroup14SHA1:
         return SHA1.new(data)
 
     @staticmethod
-    def protocol(client: Client, client_kex_init: Reader, server_kex_init: Reader, *args, **kwargs):
+    def protocol(client, client_kex_init: Reader, server_kex_init: Reader, *args, **kwargs):
         """
         Diffie-Hellman Group 14 Key Exchange with SHA-1 Protocol
         """
@@ -182,7 +183,7 @@ class ECDHcurve25519SHA256:
 
     
     @staticmethod
-    def protocol(client: Client, client_kex_init: Reader, server_kex_init: Reader, *args, **kwargs):
+    def protocol(client, client_kex_init: Reader, server_kex_init: Reader, *args, **kwargs):
         """
 
         RFC8731#3.1
@@ -216,7 +217,7 @@ class ECDHcurve25519SHA256:
                 mpint(curve25519.shared_key_K)
 
             hash_h = curve25519.hash(concat)
-            client.exchange_hash = hash_h.digest()
+            setattr(client, 'exchange_hash', hash_h.digest())
             signature = client.host_key.sign(client.exchange_hash)
 
             reply = Message()
@@ -253,7 +254,7 @@ all_kex_algorithms = {
     b'ecdh-sha2-nistp256': ECDHcurve25519SHA256
 }
 
-def select_algorithm(client: Client, kex_algorithms: List[bytes]) -> KeyExchange:
+def select_algorithm(client, kex_algorithms: List[bytes]) -> KeyExchange:
     """
     Selects the most secure algorithm from the given list of algorithms.
 
