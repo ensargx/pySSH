@@ -6,8 +6,12 @@ from .hostkey import RSAKey
 from pyssh.util import mpint, string, byte
 
 from pyssh._core.kex import select_algorithm
+from pyssh._core.kex import KeyExchange
 
 from pyssh._core import packets
+
+from Crypto.Util import Counter
+from Crypto.Cipher import AES
 
 class Client:
     def __init__(
@@ -22,6 +26,9 @@ class Client:
         self.encryption = None
         self.mac = None
         self.compression = None
+        self.kex: KeyExchange = None
+        self.session_id = None
+        self.client_banner = None
 
         return self.setup_connection(*args, **kwargs)
     
@@ -123,6 +130,56 @@ class Client:
 
         kex_algorithm = select_algorithm(self, kex_algorithms)
         kex_algorithm.protocol(self, client_kex_init=client_kex_init, *args, **kwargs)
+
+        """
+        Encryption keys MUST be computed as HASH, of a known value and K, as
+        follows:
+        o  Initial IV client to server: HASH(K || H || "A" || session_id)
+            (Here K is encoded as mpint and "A" as byte and session_id as raw
+            data.  "A" means the single character A, ASCII 65).
+
+        o  Initial IV server to client: HASH(K || H || "B" || session_id)
+
+        o  Encryption key client to server: HASH(K || H || "C" || session_id)
+
+        o  Encryption key server to client: HASH(K || H || "D" || session_id)
+
+        o  Integrity key client to server: HASH(K || H || "E" || session_id)
+
+        o  Integrity key server to client: HASH(K || H || "F" || session_id)
+
+        Key data MUST be taken from the beginning of the hash output.  As
+        many bytes as needed are taken from the beginning of the hash value.
+        If the key length needed is longer than the output of the HASH, the
+        key is extended by computing HASH of the concatenation of K and H and
+        the entire key so far, and appending the resulting bytes (as many as
+        HASH generates) to the key.  This process is repeated until enough
+        key material is available; the key is taken from the beginning of
+        this value.  In other words:
+
+            K1 = HASH(K || H || X || session_id)   (X is e.g., "A")
+            K2 = HASH(K || H || K1)
+            K3 = HASH(K || H || K1 || K2)
+            ...
+            key = K1 || K2 || K3 || ...
+
+        This process will lose entropy if the amount of entropy in K is
+        larger than the internal state size of HASH.
+        """
+        initial_iv_c2s = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"A" + self.kex.session_id)
+        initial_iv_s2c = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"B" + self.kex.session_id)
+        encryption_key_c2s = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"C" + self.kex.session_id)
+        encryption_key_s2c = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"D" + self.kex.session_id)
+        integrity_key_c2s = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"E" + self.kex.session_id)
+        integrity_key_s2c = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"F" + self.kex.session_id)
+
+        data = self.client_sock.recv(4096)
+
+        ctr = Counter.new(128, initial_value=int.from_bytes(initial_iv_c2s[:16], "big"))
+        cipher = AES.new(encryption_key_c2s[:16], AES.MODE_CTR, counter=ctr)
+
+        data = cipher.decrypt(data)
+        print(data)
 
 
         return self.loop(*args, **kwargs)

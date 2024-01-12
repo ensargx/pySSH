@@ -4,7 +4,6 @@ from pyssh.util import mpint, string, byte
 from Crypto.PublicKey import RSA
 
 from Crypto.Signature import pkcs1_15
-
 from Crypto.Hash import SHA1, SHA256
 
 # class RSAKey(HostKey):
