@@ -173,12 +173,15 @@ class Client:
         integrity_key_c2s = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"E" + self.kex.session_id)
         integrity_key_s2c = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"F" + self.kex.session_id)
 
-        data = self.client_sock.recv(4096)
+        # MAC ALGORITHM : HMAC-SHA1 (20 bytes)
+        raw_data = self.client_sock.recv(4096)
+        encrypted_data = raw_data[:-20]
+        mac = raw_data[-20:]
 
         ctr = Counter.new(128, initial_value=int.from_bytes(initial_iv_c2s[:16], "big"))
         cipher = AES.new(encryption_key_c2s[:16], AES.MODE_CTR, counter=ctr)
 
-        data = cipher.decrypt(data)
+        data = cipher.decrypt(encrypted_data)
         print(data)
 
 
