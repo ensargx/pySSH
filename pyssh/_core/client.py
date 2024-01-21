@@ -26,7 +26,7 @@ class Client:
         self.encryption = None
         self.mac = None
         self.compression = None
-        self.kex: KeyExchange = None
+        self.kex: KeyExchange
         self.session_id = None
         self.client_banner = None
 

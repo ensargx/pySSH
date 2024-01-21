@@ -32,32 +32,32 @@ class KeyExchange(Protocol):
         pass
 
     @property
-    def K(self):
+    def K(self) -> int:
         """
         Shared Secret Key
         """
-        pass
+        ...
 
     @property
-    def H(self):
+    def H(self) -> bytes:
         """
         Shared Hash
         """
-        pass
+        ...
 
     @property
-    def session_id(self):
+    def session_id(self) -> bytes:
         """
         Session ID
         """
-        pass
+        ...
 
     @staticmethod
-    def hash(data: bytes):
+    def hash(data: bytes) -> bytes:
         """
         Hash Function
         """
-        pass
+        ...
 
 
 class DHGroup1SHA1:
@@ -273,7 +273,8 @@ class ECDHcurve25519SHA256:
         """
         Shared Secret Key
         """
-        return self.shared_secret_K
+        # return self.shared_secret_K
+        return int.from_bytes(self.shared_secret_K, byteorder='big')
     
     @property
     def H(self):
