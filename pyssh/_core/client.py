@@ -176,12 +176,31 @@ class Client:
         # MAC ALGORITHM : HMAC-SHA1 (20 bytes)
         raw_data = self.client_sock.recv(4096)
         encrypted_data = raw_data[:-20]
-        mac = raw_data[-20:]
+        mac_sent = raw_data[-20:]
 
         ctr = Counter.new(128, initial_value=int.from_bytes(initial_iv_c2s[:16], "big"))
         cipher = AES.new(encryption_key_c2s[:16], AES.MODE_CTR, counter=ctr)
 
         data = cipher.decrypt(encrypted_data)
+
+        packet_len = int.from_bytes(data[:4], "big")
+        padding_len = data[4]
+        payload = data[5:packet_len]
+        random_padding = data[packet_len:packet_len+padding_len]
+
+        reader = Reader(payload)
+        byte_service_req = reader.read_byte()
+        service_req = reader.read_string()
+
+        print(byte_service_req)
+        print(service_req)
+
+        # controll mac
+        from Crypto.Hash import HMAC, SHA1
+        mac = HMAC.new(integrity_key_c2s[:20], digestmod=SHA1)
+        mac.update(data)
+        mac = mac.digest()
+
         print(data)
 
 
