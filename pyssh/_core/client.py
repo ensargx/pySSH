@@ -5,7 +5,7 @@ from .hostkey import RSAKey
 
 from pyssh.util import mpint, string, byte
 
-from pyssh._core import packets, kex
+from pyssh._core import packets, kex, encryption
 
 from Crypto.Util import Counter
 from Crypto.Cipher import AES
@@ -20,7 +20,8 @@ class Client:
         self.client_sock = client_sock
         self.server_banner = packets.pyssh_banner
 
-        self.encryption = None
+        self.encryption_c2s = None
+        self.encryption_s2c = None
         self.mac = None
         self.compression = None
         self.kex: kex.KeyExchange
@@ -35,11 +36,11 @@ class Client:
         if self.compression is not None:
             data = self.compression.decompress(data)
 
+        if self.encryption_c2s is not None:
+            data = self.encryption_c2s.decrypt(data)
+
         if self.mac is not None:
             self.mac.verify(data)
-
-        if self.encryption is not None:
-            data = self.encryption.decrypt(data)
 
         data = packets.ssh_packet(data)
         return Reader(data.payload)
@@ -66,8 +67,8 @@ class Client:
         for message in messages:
             data = message.payload
 
-            if self.encryption is not None:
-                data = self.encryption.encrypt(data, **kwargs)
+            if self.encryption_s2c is not None:
+                data = self.encryption_s2c.encrypt(data, **kwargs)
 
             if self.mac is not None:
                 self.mac.sign(data, **kwargs)
@@ -118,6 +119,10 @@ class Client:
         languages_server_to_client = client_kex_init.read_name_list()
         first_kex_packet_follows = client_kex_init.read_boolean()
         reserved = client_kex_init.read_uint32()
+        # pyright thinks reserved is unused, and it is, and gives warning, so we use it
+        reserved = reserved
+        # cookie is unused too, so we use it
+        cookie = cookie
 
         # TODO : IMPLEMENT HOST KEY STUFF...
         print("HOST KEY STUFF: IMPLEMENT ME")
@@ -126,43 +131,20 @@ class Client:
         self.host_key = host_key
 
         kex_algorithm = kex.select_algorithm(self, kex_algorithms)
+        if kex_algorithm is None:
+            raise Exception("No supported key exchange algorithm found.") # TODO: Implement exception
+
+        # Set encryption algorithms, TODO: Fix this, server algorithm should be used
+        encryption_s2c = encryption.select_algorithm(encryption_algorithms_client_to_server, encryption_algorithms_server_to_client)
+        if encryption_s2c is None:
+            raise Exception("No supported encryption algorithm found.")
+        encryption_c2s = encryption.select_algorithm(encryption_algorithms_client_to_server, encryption_algorithms_server_to_client)
+        if encryption_c2s is None:
+            raise Exception("No supported encryption algorithm found.")
+
+
         kex_algorithm.protocol(self, client_kex_init=client_kex_init, *args, **kwargs)
 
-        """
-        Encryption keys MUST be computed as HASH, of a known value and K, as
-        follows:
-        o  Initial IV client to server: HASH(K || H || "A" || session_id)
-            (Here K is encoded as mpint and "A" as byte and session_id as raw
-            data.  "A" means the single character A, ASCII 65).
-
-        o  Initial IV server to client: HASH(K || H || "B" || session_id)
-
-        o  Encryption key client to server: HASH(K || H || "C" || session_id)
-
-        o  Encryption key server to client: HASH(K || H || "D" || session_id)
-
-        o  Integrity key client to server: HASH(K || H || "E" || session_id)
-
-        o  Integrity key server to client: HASH(K || H || "F" || session_id)
-
-        Key data MUST be taken from the beginning of the hash output.  As
-        many bytes as needed are taken from the beginning of the hash value.
-        If the key length needed is longer than the output of the HASH, the
-        key is extended by computing HASH of the concatenation of K and H and
-        the entire key so far, and appending the resulting bytes (as many as
-        HASH generates) to the key.  This process is repeated until enough
-        key material is available; the key is taken from the beginning of
-        this value.  In other words:
-
-            K1 = HASH(K || H || X || session_id)   (X is e.g., "A")
-            K2 = HASH(K || H || K1)
-            K3 = HASH(K || H || K1 || K2)
-            ...
-            key = K1 || K2 || K3 || ...
-
-        This process will lose entropy if the amount of entropy in K is
-        larger than the internal state size of HASH.
-        """
         initial_iv_c2s = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"A" + self.kex.session_id)
         initial_iv_s2c = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"B" + self.kex.session_id)
         encryption_key_c2s = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"C" + self.kex.session_id)
@@ -170,7 +152,10 @@ class Client:
         integrity_key_c2s = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"E" + self.kex.session_id)
         integrity_key_s2c = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"F" + self.kex.session_id)
 
-        # MAC ALGORITHM : HMAC-SHA1 (20 bytes)
+        # Encryption is now enabled
+        self.encryption_c2s = encryption_c2s(encryption_key_c2s, initial_iv_c2s)
+        self.encryption_s2c = encryption_s2c(encryption_key_s2c, initial_iv_s2c)
+
         raw_data = self.client_sock.recv(4096)
         encrypted_data = raw_data[:-20]
         mac_sent = raw_data[-20:]

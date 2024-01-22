@@ -5,6 +5,12 @@ from Crypto.Util import Counter
 
 class Encryption(Protocol):
     
+    def __init__(self, encryption_key: bytes, initial_iv: bytes):
+        """
+        Initializes the encryption algorithm.
+        """
+        ...
+
     def encrypt(self, plaintext) -> bytes:
         """
         Encrypts the plaintext and returns the ciphertext.
@@ -19,7 +25,7 @@ class Encryption(Protocol):
 
 
 class AES128CTR:
-    def __init__(self, initial_iv: bytes, encryption_key: bytes):
+    def __init__(self, encryption_key: bytes, initial_iv: bytes):
         self.ctr = Counter.new(128, initial_value=int.from_bytes(initial_iv, "big"))
         self.cipher = AES.new(encryption_key, AES.MODE_CTR, counter=self.ctr)
 
@@ -35,7 +41,7 @@ supperted_algorithms = {
         b"aes128-ctr": AES128CTR,
         }
 
-def select_encryption_algorithm(algorithms_client: List[bytes], algorithms_server: List[bytes]) -> Encryption:
+def select_algorithm(algorithms_client: List[bytes], algorithms_server: List[bytes]):
     """
     Selects an encryption algorithm to use for the communication.
     """ 
@@ -45,4 +51,3 @@ def select_encryption_algorithm(algorithms_client: List[bytes], algorithms_serve
         if algorithm_client in algorithms_server:
             return globals()[supperted_algorithms[algorithm_client].__name__]
 
-    raise Exception("No supported encryption algorithm found.")
