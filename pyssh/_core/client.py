@@ -5,10 +5,7 @@ from .hostkey import RSAKey
 
 from pyssh.util import mpint, string, byte
 
-from pyssh._core.kex import select_algorithm
-from pyssh._core.kex import KeyExchange
-
-from pyssh._core import packets
+from pyssh._core import packets, kex
 
 from Crypto.Util import Counter
 from Crypto.Cipher import AES
@@ -26,7 +23,7 @@ class Client:
         self.encryption = None
         self.mac = None
         self.compression = None
-        self.kex: KeyExchange
+        self.kex: kex.KeyExchange
         self.session_id = None
         self.client_banner = None
 
@@ -128,7 +125,7 @@ class Client:
         host_key = RSAKey("/home/ensargok/keys/id_rsa.pub", "/home/ensargok/keys/id_rsa")
         self.host_key = host_key
 
-        kex_algorithm = select_algorithm(self, kex_algorithms)
+        kex_algorithm = kex.select_algorithm(self, kex_algorithms)
         kex_algorithm.protocol(self, client_kex_init=client_kex_init, *args, **kwargs)
 
         """
