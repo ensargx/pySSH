@@ -51,15 +51,16 @@ class pySSH:
         import pyssh
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(('localhost', 22))
+        sock.bind(('localhost', port))
 
         sock.listen(1)
 
             # Demo server algorithms
         server_kex_algorithms = [
+            b"curve25519-sha256",
+            b"ecdh-sha2-nistp256",
             b"diffie-hellman-group14-sha1",
             b"diffie-hellman-group1-sha1",
-            b"curve25519-sha256"
         ]
         server_host_key_algorithms = [
             b"ssh-rsa"

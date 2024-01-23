@@ -144,7 +144,7 @@ class Client:
             raise Exception("No supported encryption algorithm found.")
 
 
-        kex_algorithm.protocol(self, client_kex_init=client_kex_init, server_kex_init=server_kex_init)
+        self.kex = kex_algorithm.protocol(self, client_kex_init=client_kex_init, server_kex_init=server_kex_init)
 
         initial_iv_c2s = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"A" + self.kex.session_id)
         initial_iv_s2c = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"B" + self.kex.session_id)

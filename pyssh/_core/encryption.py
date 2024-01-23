@@ -36,10 +36,9 @@ class AES128CTR:
         return self.cipher.decrypt(ciphertext)
 
 
-
 supperted_algorithms = {
         b"aes128-ctr": AES128CTR,
-        }
+    }
 
 def select_algorithm(algorithms: List[bytes], server_algorithms: List[bytes]):
     """

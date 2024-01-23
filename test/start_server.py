@@ -1,7 +1,7 @@
 from pyssh import pySSH
 
 app = pySSH(
-    hostkey_path="~/keys/",
+    hostkey_path = '/home/ensargok/keys/'
 )
 
-app.run()
+app.run(2222)
