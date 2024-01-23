@@ -26,8 +26,8 @@ class Encryption(Protocol):
 
 class AES128CTR:
     def __init__(self, encryption_key: bytes, initial_iv: bytes):
-        self.ctr = Counter.new(128, initial_value=int.from_bytes(initial_iv, "big"))
-        self.cipher = AES.new(encryption_key, AES.MODE_CTR, counter=self.ctr)
+        self.ctr = Counter.new(128, initial_value=int.from_bytes(initial_iv[:16], "big"))
+        self.cipher = AES.new(encryption_key[:16], AES.MODE_CTR, counter=self.ctr)
 
     def encrypt(self, plaintext: bytes) -> bytes:
         return self.cipher.encrypt(plaintext)
@@ -41,13 +41,14 @@ supperted_algorithms = {
         b"aes128-ctr": AES128CTR,
         }
 
-def select_algorithm(algorithms_client: List[bytes], algorithms_server: List[bytes]):
+def select_algorithm(algorithms: List[bytes], server_algorithms: List[bytes]):
     """
     Selects an encryption algorithm to use for the communication.
+
+    :param algorithms_client: List of algorithms supported by the client.
     """ 
 
     # Select the first algorithm that is supported by both client and server.
-    for algorithm_client in algorithms_client:
-        if algorithm_client in algorithms_server:
-            return globals()[supperted_algorithms[algorithm_client].__name__]
-
+    for algorithm in algorithms:
+        if algorithm in server_algorithms:
+            return supperted_algorithms[algorithm]

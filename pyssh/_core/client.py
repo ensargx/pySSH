@@ -1,20 +1,24 @@
 from socket import socket
 from .message import Message
 from .reader import Reader
-from .hostkey import RSAKey
 
-from pyssh.util import mpint, string, byte
+from pyssh.util import mpint
+from pyssh._core import hostkey
 
 from pyssh._core import packets, kex, encryption
 
 from Crypto.Util import Counter
 from Crypto.Cipher import AES
 
+from typing import Dict, List
+
 class Client:
     def __init__(
         self,
         client_sock: socket,
-        *args, 
+        server_algorithms: Dict[str, List[bytes]],
+        server_hostkeys: Dict[bytes, hostkey.HostKey],
+        *args,
         **kwargs
     ):
         self.client_sock = client_sock
@@ -27,8 +31,9 @@ class Client:
         self.kex: kex.KeyExchange
         self.session_id = None
         self.client_banner = None
+        self.hostkey: hostkey.HostKey = None
 
-        return self.setup_connection(*args, **kwargs)
+        return self.setup_connection(server_algorithms, server_hostkeys, *args, **kwargs)
     
     def recv(self, *args, **kwargs) -> Reader:
         data = self.client_sock.recv(4096)
@@ -82,7 +87,7 @@ class Client:
         self.client_sock.send(raw_data)
 
 
-    def setup_connection(self, *args, **kwargs):
+    def setup_connection(self, server_algorithms, server_hostkeys, *args, **kwargs):
         self.client_sock.send(self.server_banner)
         
         client_banner = self.client_sock.recv(4096)
@@ -96,9 +101,6 @@ class Client:
         self.client_sock.send(bytes(server_kex_init))
         server_kex_init = Reader(server_kex_init.payload)
 
-        return self.key_exchange_init(server_kex_init=server_kex_init, client_banner=client_banner, *args, **kwargs)
-
-    def key_exchange_init(self, *args, **kwargs):
         client_kex_init = self.client_sock.recv(4096)
         client_kex_init = packets.ssh_packet(client_kex_init)
         client_kex_init = Reader(client_kex_init.payload)
@@ -124,26 +126,25 @@ class Client:
         # cookie is unused too, so we use it
         cookie = cookie
 
-        # TODO : IMPLEMENT HOST KEY STUFF...
-        print("HOST KEY STUFF: IMPLEMENT ME")
-        from pyssh._core.hostkey import RSAKey
-        host_key = RSAKey("/home/ensargok/keys/id_rsa.pub", "/home/ensargok/keys/id_rsa")
-        self.host_key = host_key
-
-        kex_algorithm = kex.select_algorithm(self, kex_algorithms)
+        kex_algorithm = kex.select_algorithm(kex_algorithms, server_algorithms["kex_algorithms"])
         if kex_algorithm is None:
             raise Exception("No supported key exchange algorithm found.") # TODO: Implement exception
 
+        host_key_algorithm = hostkey.select_algorithm(server_host_key_algorithms, server_algorithms["host_key_algorithms"])
+        if host_key_algorithm is None:
+            raise Exception("No supported host key algorithm found.") # TODO: Implement exception
+        self.hostkey = server_hostkeys[host_key_algorithm]
+
         # Set encryption algorithms, TODO: Fix this, server algorithm should be used
-        encryption_s2c = encryption.select_algorithm(encryption_algorithms_client_to_server, encryption_algorithms_server_to_client)
+        encryption_s2c = encryption.select_algorithm(encryption_algorithms_server_to_client, server_algorithms["encryption_algorithms_s2c"])
         if encryption_s2c is None:
             raise Exception("No supported encryption algorithm found.")
-        encryption_c2s = encryption.select_algorithm(encryption_algorithms_client_to_server, encryption_algorithms_server_to_client)
+        encryption_c2s = encryption.select_algorithm(encryption_algorithms_client_to_server, server_algorithms["encryption_algorithms_c2s"])
         if encryption_c2s is None:
             raise Exception("No supported encryption algorithm found.")
 
 
-        kex_algorithm.protocol(self, client_kex_init=client_kex_init, *args, **kwargs)
+        kex_algorithm.protocol(self, client_kex_init=client_kex_init, server_kex_init=server_kex_init)
 
         initial_iv_c2s = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"A" + self.kex.session_id)
         initial_iv_s2c = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"B" + self.kex.session_id)
@@ -160,10 +161,7 @@ class Client:
         encrypted_data = raw_data[:-20]
         mac_sent = raw_data[-20:]
 
-        ctr = Counter.new(128, initial_value=int.from_bytes(initial_iv_c2s[:16], "big"))
-        cipher = AES.new(encryption_key_c2s[:16], AES.MODE_CTR, counter=ctr)
-
-        data = cipher.decrypt(encrypted_data)
+        data = self.encryption_c2s.decrypt(encrypted_data)
 
         packet_len = int.from_bytes(data[:4], "big")
         padding_len = data[4]
@@ -183,10 +181,10 @@ class Client:
         mac.update(data)
         mac = mac.digest()
 
-        print(data)
+        print(mac == mac_sent)
 
 
-        return self.loop(*args, **kwargs)
+        # return self.loop(*args, **kwargs)
     
     def loop(self, *args, **kwargs):
         

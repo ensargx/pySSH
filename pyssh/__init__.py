@@ -4,3 +4,5 @@ from . import (
     _core,
     version
 )
+
+from ._core.server import pySSH

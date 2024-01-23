@@ -94,18 +94,18 @@ class DHGroup1SHA1:
                 string(client.server_banner.rstrip(b'\r\n')) + \
                 string(client_kex_init.message) + \
                 string(server_kex_init.message) + \
-                string(client.host_key.get_key()) + \
+                string(client.hostkey.get_key()) + \
                 mpint(dh_g1.e) + \
                 mpint(dh_g1.f) + \
                 mpint(dh_g1.k)
             
             hash_h = dh_g1.hash(concat)
             client.exchange_hash = hash_h.digest()
-            signature = client.host_key.sign(client.exchange_hash)
+            signature = client.hostkey.sign(client.exchange_hash)
 
             reply = Message()
             reply.write_byte(31)
-            reply.write_string(client.host_key.get_key())
+            reply.write_string(client.hostkey.get_key())
             reply.write_mpint(dh_g1.f)
             reply.write_string(signature)
 
@@ -152,18 +152,18 @@ class DHGroup14SHA1:
                 string(client.server_banner.rstrip(b'\r\n')) + \
                 string(client_kex_init.message) + \
                 string(server_kex_init.message) + \
-                string(client.host_key.get_key()) + \
+                string(client.hostkey.get_key()) + \
                 mpint(dh_g1.e) + \
                 mpint(dh_g1.f) + \
                 mpint(dh_g1.k)
             
             hash_h = dh_g1.hash(concat)
             client.exchange_hash = hash_h.digest()
-            signature = client.host_key.sign(client.exchange_hash)
+            signature = client.hostkey.sign(client.exchange_hash)
 
             reply = Message()
             reply.write_byte(31)
-            reply.write_string(client.host_key.get_key())
+            reply.write_string(client.hostkey.get_key())
             reply.write_mpint(dh_g1.f)
             reply.write_string(signature)
 
@@ -213,7 +213,7 @@ class ECDHcurve25519SHA256:
 
     
     @staticmethod
-    def protocol(client, client_kex_init: Reader, server_kex_init: Reader, *args, **kwargs):
+    def protocol(client, client_kex_init: Reader, server_kex_init: Reader):
         """
 
         RFC8731#3.1
@@ -242,7 +242,7 @@ class ECDHcurve25519SHA256:
                 string(client.server_banner.rstrip(b'\r\n')) + \
                 string(client_kex_init.message) + \
                 string(server_kex_init.message) + \
-                string(client.host_key.get_key()) + \
+                string(client.hostkey.get_key()) + \
                 string(curve25519.Q_C) + \
                 string(curve25519.Q_S) + \
                 mpint(curve25519.shared_secret_K)
@@ -250,11 +250,11 @@ class ECDHcurve25519SHA256:
             hash_h = curve25519.hash(concat)
             curve25519.exchange_hash_H = hash_h
             curve25519.session_id = hash_h
-            signature = client.host_key.sign(curve25519.exchange_hash_H)
+            signature = client.hostkey.sign(curve25519.exchange_hash_H)
 
             reply = Message()
             reply.write_byte(31)
-            reply.write_string(client.host_key.get_key())
+            reply.write_string(client.hostkey.get_key())
             reply.write_string(curve25519.Q_S)
             reply.write_string(signature)
 
@@ -288,13 +288,13 @@ class ECDHcurve25519SHA256:
         return SHA256.new(data).digest()
 
 
-all_kex_algorithms = {
+supported_algorithms = {
     b'diffie-hellman-group1-sha1': DHGroup1SHA1,
     b'diffie-hellman-group14-sha1': DHGroup14SHA1,
     b'curve25519-sha256': ECDHcurve25519SHA256
 }
 
-def select_algorithm(client, kex_algorithms: List[bytes]) -> KeyExchange:
+def select_algorithm(client_algorithms: List[bytes], server_algorithms: List[bytes]) -> KeyExchange:
     """
     Selects the most secure algorithm from the given list of algorithms.
 
@@ -306,8 +306,6 @@ def select_algorithm(client, kex_algorithms: List[bytes]) -> KeyExchange:
     :rtype: class
     """
 
-    for algorithm in kex_algorithms:
-        if algorithm in all_kex_algorithms:
-            return all_kex_algorithms[algorithm]
-    
-    raise NotImplementedError(f"No algortithms to use, not implemented.")
+    for algorithm in client_algorithms:
+        if algorithm in server_algorithms:
+            return supported_algorithms[algorithm]
