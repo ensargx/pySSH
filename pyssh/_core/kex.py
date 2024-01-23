@@ -115,7 +115,6 @@ class DHGroup1SHA1:
         Shared Hash
         """
         return self.hash_h
-    
 
 class DHGroup14SHA1:
     """Diffie-Hellman Group 14 Key Exchange with SHA-1"""
@@ -538,7 +537,19 @@ class ECDHSHA2NISTP521(KeyExchange):
     def hash(data: bytes) -> bytes:
         return SHA512.new(data).digest()
 
+# TODO: implement
+class SNTRUP761x25519SHA512(KeyExchange):
+    name = b'sntrup761x25519-sha512'
+    ...
 
+# TODO: implement
+class DHGroupExchangeSHA256(KeyExchange):
+    name = b'diffie-hellman-group-exchange-sha256'
+    ...
+
+# TODO: implement
+class DHGroup16SHA52(KeyExchange):
+    name = b'diffie-hellman-group16-sha51'
 
 # kex_algorithms string [truncated]:
 #   curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256
@@ -551,6 +562,10 @@ supported_algorithms = {
     b'ecdh-sha2-nistp256': ECDHSHA2NISTP256,
     b'ecdh-sha2-nistp384': ECDHSHA2NISTP384,
     b'ecdh-sha2-nistp521': ECDHSHA2NISTP521,
+    b'sntrup761x25519-sha512': SNTRUP761x25519SHA512,
+    b'sntrup761x25519-sha512@openssh.com': SNTRUP761x25519SHA512,
+    b'diffie-hellman-group-exchange-sha256': DHGroupExchangeSHA256,
+    b'diffie-hellman-group16-sha51': DHGroup16SHA52,
     b'diffie-hellman-group1-sha1': DHGroup1SHA1,
     b'diffie-hellman-group14-sha1': DHGroup14SHA1,
 }

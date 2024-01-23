@@ -1,6 +1,7 @@
 import os
 
 from pyssh._core import hostkey
+from pyssh._core import kex
 
 class pySSH:
     def __init__(self, hostkey_path: str = './keys/'):
@@ -48,7 +49,6 @@ class pySSH:
         self.load_hostkeys()
 
         import socket
-        import pyssh
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.bind(('localhost', port))
@@ -56,15 +56,7 @@ class pySSH:
         sock.listen(1)
 
             # Demo server algorithms
-        server_kex_algorithms = [
-            b'curve25519-sha256',
-            b'curve25519-sha256@libssh.org',
-            b'ecdh-sha2-nistp256',
-            b'ecdh-sha2-nistp384',
-            b'ecdh-sha2-nistp521',
-            b'diffie-hellman-group1-sha1',
-            b'diffie-hellman-group14-sha1',
-        ]
+        server_kex_algorithms = [name for name in kex.supported_algorithms.keys()]
         server_host_key_algorithms = [
             b"ssh-rsa"
         ]

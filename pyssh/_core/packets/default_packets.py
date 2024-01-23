@@ -174,6 +174,9 @@ def key_exchange_init():
         b'diffie-hellman-group1-sha1',
         b'diffie-hellman-group14-sha1',
     ])
+    
+    from pyssh._core import kex
+    algorithms = b",".join(name for name in kex.supported_algorithms.keys())
 
     _payload += len(algorithms).to_bytes(4, byteorder="big") # kex_algorithms length
     _payload += algorithms
