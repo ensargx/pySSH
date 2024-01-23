@@ -8,7 +8,7 @@ from cryptography.hazmat.primitives.asymmetric import x25519
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 
-from Crypto.Hash import SHA1, SHA256, SHA384
+from Crypto.Hash import SHA1, SHA256, SHA384, SHA512
 
 from typing import List, Protocol
 
@@ -186,7 +186,6 @@ class DHGroup14SHA1:
     def hash(data: bytes):
         return SHA1.new(data).digest()
 
-
 class Curve25519SHA256:
     """Elliptic Curve Diffie-Hellman Curve25519 Key Exchange with SHA-256
     
@@ -298,7 +297,6 @@ class Curve25519SHA256:
     @staticmethod
     def hash(data: bytes):
         return SHA256.new(data).digest()
-
 
 class ECDHSHA2NISTP256(KeyExchange):
     """
@@ -461,7 +459,85 @@ class ECDHSHA2NISTP384(KeyExchange):
     @staticmethod
     def hash(data: bytes) -> bytes:
         return SHA384.new(data).digest()
+
+class ECDHSHA2NISTP521(KeyExchange):
+    name = b'ecdh-sha2-nistp521'
+
+    def __init__(self, Q_C):
+        if len(Q_C) != 133:
+            raise ValueError("Invalid Q_C length")
+        self.Q_C = Q_C
+
+        # Convert Q_C to nistp384
+        self.peer_public_key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP521R1(), Q_C)
+
+        # Generate private key
+        self.private_key = ec.generate_private_key(ec.SECP521R1())
+
+        # Convert public key to bytes
+        self.Q_S = self.private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.X962,
+            format=serialization.PublicFormat.UncompressedPoint
+        )
+        
+        # Calculate shared secret
+        self.shared_secret_K = self.private_key.exchange(ec.ECDH(), self.peer_public_key)
+
+
+    @staticmethod
+    def protocol(client, client_kex_init: Reader, server_kex_init: Reader):
+        packet: Reader = client.recv()
+
+        message_code = packet.read_byte()
+        assert message_code == 30
+
+        Q_C = packet.read_string()
+
+        ecdh = ECDHSHA2NISTP521(Q_C)
+
+        concat = \
+            string(client.client_banner.rstrip(b'\r\n')) + \
+            string(client.server_banner.rstrip(b'\r\n')) + \
+            string(client_kex_init.message) + \
+            string(server_kex_init.message) + \
+            string(client.hostkey.get_key()) + \
+            string(ecdh.Q_C) + \
+            string(ecdh.Q_S) + \
+            mpint(ecdh.shared_secret_K)
+        
+        hash_h = ecdh.hash(concat)
+        ecdh.exchange_hash_H = hash_h
+        ecdh.session_id = hash_h
+        signature = client.hostkey.sign(ecdh.exchange_hash_H)
+
+        reply = Message()
+        reply.write_byte(31)
+        reply.write_string(client.hostkey.get_key())
+        reply.write_string(ecdh.Q_S)
+        reply.write_string(signature)
+
+        reply_new_keys = Message()
+        reply_new_keys.write_byte(21)
+
+        client.send(reply, reply_new_keys)
+
+        new_keys = client.recv()
+        assert new_keys.read_byte() == 21
+
+        return ecdh
     
+    @property
+    def K(self) -> int:
+        return int.from_bytes(self.shared_secret_K, byteorder='big')
+    
+    @property
+    def H(self) -> bytes:
+        return self.exchange_hash_H
+
+    @staticmethod
+    def hash(data: bytes) -> bytes:
+        return SHA512.new(data).digest()
+
 
 
 # kex_algorithms string [truncated]:
@@ -474,6 +550,7 @@ supported_algorithms = {
     b'curve25519-sha256@libssh.org': Curve25519SHA256,
     b'ecdh-sha2-nistp256': ECDHSHA2NISTP256,
     b'ecdh-sha2-nistp384': ECDHSHA2NISTP384,
+    b'ecdh-sha2-nistp521': ECDHSHA2NISTP521,
     b'diffie-hellman-group1-sha1': DHGroup1SHA1,
     b'diffie-hellman-group14-sha1': DHGroup14SHA1,
 }

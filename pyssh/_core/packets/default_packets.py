@@ -170,6 +170,7 @@ def key_exchange_init():
         b'curve25519-sha256@libssh.org',
         b'ecdh-sha2-nistp256',
         b'ecdh-sha2-nistp384',
+        b'ecdh-sha2-nistp521',
         b'diffie-hellman-group1-sha1',
         b'diffie-hellman-group14-sha1',
     ])
