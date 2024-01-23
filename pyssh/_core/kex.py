@@ -8,9 +8,7 @@ from cryptography.hazmat.primitives.asymmetric import x25519
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 
-from Crypto.Hash import SHA1, SHA256
-from Crypto.Hash.SHA1 import SHA1Hash
-from Crypto.Hash.SHA256 import SHA256Hash
+from Crypto.Hash import SHA1, SHA256, SHA384
 
 from typing import List, Protocol
 
@@ -98,6 +96,8 @@ class DHGroup1SHA1:
 
             client.send(reply)
 
+            return dh_g1
+
     @property
     def K(self) -> int:
         """
@@ -106,8 +106,8 @@ class DHGroup1SHA1:
         return int.from_bytes(self.k, byteorder='big')
     
     @staticmethod
-    def hash(data: bytes) -> SHA1Hash:
-        return SHA1.new(data)
+    def hash(data: bytes):
+        return SHA1.new(data).digest()
     
     @property
     def H(self) -> bytes:
@@ -116,13 +116,6 @@ class DHGroup1SHA1:
         """
         return self.hash_h
     
-    @property
-    def session_id(self) -> bytes:
-        """
-        Session ID
-        """
-        return self.session_id
-
 
 class DHGroup14SHA1:
     """Diffie-Hellman Group 14 Key Exchange with SHA-1"""
@@ -173,6 +166,8 @@ class DHGroup14SHA1:
 
             client.send(reply)
 
+            return dh_g1
+
     @property
     def K(self) -> int:
         """
@@ -186,17 +181,10 @@ class DHGroup14SHA1:
         Shared Hash
         """
         return self.hash_h
-    
-    @property
-    def session_id(self) -> bytes:
-        """
-        Session ID
-        """
-        return self.session_id
 
     @staticmethod
-    def hash(data: bytes) -> SHA1Hash:
-        return SHA1.new(data)
+    def hash(data: bytes):
+        return SHA1.new(data).digest()
 
 
 class Curve25519SHA256:
@@ -395,6 +383,86 @@ class ECDHSHA2NISTP256(KeyExchange):
     def hash(data: bytes) -> bytes:
         return SHA256.new(data).digest()
 
+class ECDHSHA2NISTP384(KeyExchange):
+    name = b'ecdh-sha2-nistp384'
+
+    def __init__(self, Q_C):
+        if len(Q_C) != 97:
+            raise ValueError("Invalid Q_C length")
+        self.Q_C = Q_C
+
+        # Convert Q_C to nistp384
+        self.peer_public_key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP384R1(), Q_C)
+
+        # Generate private key
+        self.private_key = ec.generate_private_key(ec.SECP384R1())
+
+        # Convert public key to bytes
+        self.Q_S = self.private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.X962,
+            format=serialization.PublicFormat.UncompressedPoint
+        )
+        
+        # Calculate shared secret
+        self.shared_secret_K = self.private_key.exchange(ec.ECDH(), self.peer_public_key)
+
+
+    @staticmethod
+    def protocol(client, client_kex_init: Reader, server_kex_init: Reader):
+        packet: Reader = client.recv()
+
+        message_code = packet.read_byte()
+        assert message_code == 30
+
+        Q_C = packet.read_string()
+        assert len(Q_C) == 97
+
+        ecdh = ECDHSHA2NISTP384(Q_C)
+
+        concat = \
+            string(client.client_banner.rstrip(b'\r\n')) + \
+            string(client.server_banner.rstrip(b'\r\n')) + \
+            string(client_kex_init.message) + \
+            string(server_kex_init.message) + \
+            string(client.hostkey.get_key()) + \
+            string(ecdh.Q_C) + \
+            string(ecdh.Q_S) + \
+            mpint(ecdh.shared_secret_K)
+        
+        hash_h = ecdh.hash(concat)
+        ecdh.exchange_hash_H = hash_h
+        ecdh.session_id = hash_h
+        signature = client.hostkey.sign(ecdh.exchange_hash_H)
+
+        reply = Message()
+        reply.write_byte(31)
+        reply.write_string(client.hostkey.get_key())
+        reply.write_string(ecdh.Q_S)
+        reply.write_string(signature)
+
+        reply_new_keys = Message()
+        reply_new_keys.write_byte(21)
+
+        client.send(reply, reply_new_keys)
+
+        new_keys = client.recv()
+        assert new_keys.read_byte() == 21
+
+        return ecdh
+    
+    @property
+    def K(self) -> int:
+        return int.from_bytes(self.shared_secret_K, byteorder='big')
+    
+    @property
+    def H(self) -> bytes:
+        return self.exchange_hash_H
+
+    @staticmethod
+    def hash(data: bytes) -> bytes:
+        return SHA384.new(data).digest()
+    
+
 
 # kex_algorithms string [truncated]:
 #   curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256
@@ -405,6 +473,7 @@ supported_algorithms = {
     b'curve25519-sha256': Curve25519SHA256,
     b'curve25519-sha256@libssh.org': Curve25519SHA256,
     b'ecdh-sha2-nistp256': ECDHSHA2NISTP256,
+    b'ecdh-sha2-nistp384': ECDHSHA2NISTP384,
     b'diffie-hellman-group1-sha1': DHGroup1SHA1,
     b'diffie-hellman-group14-sha1': DHGroup14SHA1,
 }

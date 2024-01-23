@@ -57,10 +57,12 @@ class pySSH:
 
             # Demo server algorithms
         server_kex_algorithms = [
-            b"curve25519-sha256",
-            b"ecdh-sha2-nistp256",
-            b"diffie-hellman-group14-sha1",
-            b"diffie-hellman-group1-sha1",
+            b'curve25519-sha256',
+            b'curve25519-sha256@libssh.org',
+            b'ecdh-sha2-nistp256',
+            b'ecdh-sha2-nistp384',
+            b'diffie-hellman-group1-sha1',
+            b'diffie-hellman-group14-sha1',
         ]
         server_host_key_algorithms = [
             b"ssh-rsa"
