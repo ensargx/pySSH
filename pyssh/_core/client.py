@@ -1,25 +1,39 @@
 from socket import socket
 from .message import Message
 from .reader import Reader
-from .hostkey import RSAKey
 
-from ._util import mpint, string, byte
+from pyssh.util import mpint
+from pyssh._core import hostkey
 
-from . import kex
+from pyssh._core import packets, kex, encryption
 
-from pyssh._core._core_classes import _core_packet
-from pyssh._core import _packets
+from Crypto.Util import Counter
+from Crypto.Cipher import AES
+
+from typing import Dict, List
 
 class Client:
-    def __init__(self, client_sock: socket, *args, **kwargs):
+    def __init__(
+        self,
+        client_sock: socket,
+        server_algorithms: Dict[str, List[bytes]],
+        server_hostkeys: Dict[bytes, hostkey.HostKey],
+        *args,
+        **kwargs
+    ):
         self.client_sock = client_sock
-        self.server_banner = _packets._get_pyssh_banner()
+        self.server_banner = packets.pyssh_banner
 
-        self.encryption = None
+        self.encryption_c2s = None
+        self.encryption_s2c = None
         self.mac = None
         self.compression = None
+        self.kex: kex.KeyExchange
+        self.session_id = None
+        self.client_banner = None
+        self.hostkey: hostkey.HostKey = None
 
-        return self.setup_connection(*args, **kwargs)
+        return self.setup_connection(server_algorithms, server_hostkeys, *args, **kwargs)
     
     def recv(self, *args, **kwargs) -> Reader:
         data = self.client_sock.recv(4096)
@@ -27,16 +41,17 @@ class Client:
         if self.compression is not None:
             data = self.compression.decompress(data)
 
+        if self.encryption_c2s is not None:
+            data = self.encryption_c2s.decrypt(data)
+
         if self.mac is not None:
             self.mac.verify(data)
 
-        if self.encryption is not None:
-            data = self.encryption.decrypt(data)
-
-        data = _core_packet(data)
+        data = packets.ssh_packet(data)
         return Reader(data.payload)
     
-    def send(self, message: Message, *args, **kwargs):
+    def send(self, *messages: Message, **kwargs):
+        """
         data = message.payload
 
         if self.encryption is not None:
@@ -48,28 +63,46 @@ class Client:
         if self.compression is not None:
             data = self.compression.compress(data)
 
-        packet = _core_packet._create_packet(data)
+        packet = ssh_packet._create_packet(data)
         self.client_sock.send(bytes(packet))
+        """
 
-    def setup_connection(self, *args, **kwargs):
+        raw_data = b''
+        # For each message in messages:
+        for message in messages:
+            data = message.payload
+
+            if self.encryption_s2c is not None:
+                data = self.encryption_s2c.encrypt(data, **kwargs)
+
+            if self.mac is not None:
+                self.mac.sign(data, **kwargs)
+
+            if self.compression is not None:
+                data = self.compression.compress(data, **kwargs)
+
+            packet = packets.ssh_packet.create_packet(data, **kwargs)
+            raw_data += bytes(packet)
+
+        self.client_sock.send(raw_data)
+
+
+    def setup_connection(self, server_algorithms, server_hostkeys, *args, **kwargs):
         self.client_sock.send(self.server_banner)
         
         client_banner = self.client_sock.recv(4096)
-        client_banner = _packets._conn_setup._protocol_version_exchange(client_banner)
+        client_banner = packets.protocol_version_exchange(client_banner)
         if not client_banner:
             raise NotImplementedError("Protocol version exchange failed.")
         self.client_banner = client_banner
 
-        server_kex_init = _packets._get_key_exchange_init()
-        server_kex_init = _core_packet._create_packet(server_kex_init)
+        server_kex_init = packets.key_exchange_init()
+        server_kex_init = packets.ssh_packet.create_packet(server_kex_init)
         self.client_sock.send(bytes(server_kex_init))
         server_kex_init = Reader(server_kex_init.payload)
 
-        return self.key_exchange_init(server_kex_init=server_kex_init, client_banner=client_banner, *args, **kwargs)
-
-    def key_exchange_init(self, *args, **kwargs):
         client_kex_init = self.client_sock.recv(4096)
-        client_kex_init = _core_packet(client_kex_init)
+        client_kex_init = packets.ssh_packet(client_kex_init)
         client_kex_init = Reader(client_kex_init.payload)
 
         message_code = client_kex_init.read_byte()
@@ -88,63 +121,74 @@ class Client:
         languages_server_to_client = client_kex_init.read_name_list()
         first_kex_packet_follows = client_kex_init.read_boolean()
         reserved = client_kex_init.read_uint32()
+        # pyright thinks reserved is unused, and it is, and gives warning, so we use it
+        reserved = reserved
+        # cookie is unused too, so we use it
+        cookie = cookie
 
-        # TODO : IMPLEMENT HOST KEY STUFF...
-        print("HOST KEY STUFF: IMPLEMENT ME")
-        from pyssh._core.hostkey import RSAKey
-        host_key = RSAKey("/home/ensargok/keys/id_rsa.pub", "/home/ensargok/keys/id_rsa.pem")
-        self.host_key = host_key
+        kex_algorithm = kex.select_algorithm(kex_algorithms, server_algorithms["kex_algorithms"])
+        if kex_algorithm is None:
+            raise Exception("No supported key exchange algorithm found.") # TODO: Implement exception
 
-        kex_algorithm = kex.select_algorithm(self, kex_algorithms)
-        kex_algorithm.protocol(self, client_kex_init=client_kex_init, *args, **kwargs)
+        host_key_algorithm = hostkey.select_algorithm(server_host_key_algorithms, server_algorithms["host_key_algorithms"])
+        if host_key_algorithm is None:
+            raise Exception("No supported host key algorithm found.") # TODO: Implement exception
+        self.hostkey = server_hostkeys[host_key_algorithm]
 
-        return self.diffie_hellman(client_kex_init=client_kex_init, *args, **kwargs)
-
-    # if kex message code is 30:
-    def client_dh_g_1_14_sha1(self, message: Reader, *args, **kwargs):
-        e = message.read_mpint()
-        dh_g1 = self.kex_algorithm(e)
-
-        client_kex_init: Reader = kwargs.get("client_kex_init")
-        server_kex_init: Reader = kwargs.get("server_kex_init")
-
-        concat = \
-            string(self.client_banner.rstrip(b'\r\n')) + \
-            string(self.server_banner.rstrip(b'\r\n')) + \
-            string(client_kex_init.message) + \
-            string(server_kex_init.message) + \
-            string(self.host_key.get_key()) + \
-            mpint(dh_g1.e) + \
-            mpint(dh_g1.f) + \
-            mpint(dh_g1.k)
-
-        hash_h = dh_g1.hash(concat)
-        self.exchange_hash = hash_h.digest()
-        signature = self.host_key.sign_sha1(self.exchange_hash)
-
-        reply = Message()
-        reply.write_byte(31)
-        reply.write_string(self.host_key.get_key())
-        reply.write_mpint(dh_g1.f)
-        reply.write_string(signature)
-
-        self.send(reply)
+        # Set encryption algorithms, TODO: Fix this, server algorithm should be used
+        encryption_s2c = encryption.select_algorithm(encryption_algorithms_server_to_client, server_algorithms["encryption_algorithms_s2c"])
+        if encryption_s2c is None:
+            raise Exception("No supported encryption algorithm found.")
+        encryption_c2s = encryption.select_algorithm(encryption_algorithms_client_to_server, server_algorithms["encryption_algorithms_c2s"])
+        if encryption_c2s is None:
+            raise Exception("No supported encryption algorithm found.")
 
 
-    # if kex message code is 34:
-    def client_dh_group_exchange(self, message: Reader, *args, **kwargs):
-        raise NotImplementedError("Now i am gonna implement this")
+        kex_algorithm.protocol(self, client_kex_init=client_kex_init, server_kex_init=server_kex_init)
+
+        initial_iv_c2s = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"A" + self.kex.session_id)
+        initial_iv_s2c = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"B" + self.kex.session_id)
+        encryption_key_c2s = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"C" + self.kex.session_id)
+        encryption_key_s2c = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"D" + self.kex.session_id)
+        integrity_key_c2s = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"E" + self.kex.session_id)
+        integrity_key_s2c = self.kex.hash(mpint(self.kex.K) + self.kex.H + b"F" + self.kex.session_id)
+
+        # Encryption is now enabled
+        self.encryption_c2s = encryption_c2s(encryption_key_c2s, initial_iv_c2s)
+        self.encryption_s2c = encryption_s2c(encryption_key_s2c, initial_iv_s2c)
+
+        raw_data = self.client_sock.recv(4096)
+        encrypted_data = raw_data[:-20]
+        mac_sent = raw_data[-20:]
+
+        data = self.encryption_c2s.decrypt(encrypted_data)
+
+        packet_len = int.from_bytes(data[:4], "big")
+        padding_len = data[4]
+        payload = data[5:packet_len]
+        random_padding = data[packet_len:packet_len+padding_len]
+
+        reader = Reader(payload)
+        byte_service_req = reader.read_byte()
+        service_req = reader.read_string()
+
+        print(byte_service_req)
+        print(service_req)
+
+        # controll mac
+        from Crypto.Hash import HMAC, SHA1
+        mac = HMAC.new(integrity_key_c2s[:20], digestmod=SHA1)
+        mac.update(data)
+        mac = mac.digest()
+
+        print(mac == mac_sent)
 
 
-    def diffie_hellman(self, *args, **kwargs):
-        client_dh_init = self.recv()
+        # return self.loop(*args, **kwargs)
+    
+    def loop(self, *args, **kwargs):
         
-        message_code = client_dh_init.read_byte()
-
-        if message_code == 30:
-            return self.client_dh_g_1_14_sha1(client_dh_init, *args, **kwargs)
-        elif message_code == 32:
-            raise NotImplementedError("omg not implemented")
-        elif message_code == 34:
-            return self.client_dh_group_exchange(client_dh_init, *args, **kwargs)
-
+        """
+        Client loop.
+        """
+        pass

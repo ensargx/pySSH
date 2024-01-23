@@ -7,7 +7,7 @@ import gzip
 #                                                                               #
 #################################################################################
 
-def _protocol_version_exchange(data: bytes) -> bytes:
+def protocol_version_exchange(data: bytes) -> bytes:
     """
     When the connection has been established, both sides MUST send an
     identification string.  This identification string MUST be

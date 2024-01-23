@@ -2,8 +2,9 @@ import secrets
 
 from .message import Message
 from .reader import Reader
-from .client import Client
-from ._util import mpint, string, byte
+from pyssh.util import mpint, string, byte
+
+### TODO: import client ...
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import x25519
@@ -16,14 +17,48 @@ from Crypto.Hash.SHA256 import SHA256Hash
 
 from typing import List, Protocol
 
-class KeyExchange(Protocol):
+#TODO: fix diffie hellmans
 
+class KeyExchange(Protocol):
     @staticmethod
-    def protocol(client: Client, *args, **kwargs):
+    def protocol(client, *args, **kwargs):
         """
-        Key Exchange Protocol
+        Key Exchange Protocol.
+
+        This protocol will get K, H, and session id for the session.
+        Also will add 'kex' attribute to client which has these variables.
+        session id will be added to client as attribute as well
         """
         pass
+
+    @property
+    def K(self) -> int:
+        """
+        Shared Secret Key
+        """
+        ...
+
+    @property
+    def H(self) -> bytes:
+        """
+        Shared Hash
+        """
+        ...
+
+    @property
+    def session_id(self) -> bytes:
+        """
+        Session ID
+        """
+        ...
+
+    @staticmethod
+    def hash(data: bytes) -> bytes:
+        """
+        Hash Function
+        """
+        ...
+
 
 class DHGroup1SHA1:
     """Diffie-Hellman Group 1 Key Exchange with SHA-1"""
@@ -43,7 +78,7 @@ class DHGroup1SHA1:
         return SHA1.new(data)
     
     @staticmethod
-    def protocol(client: Client, client_kex_init: Reader, server_kex_init: Reader, *args, **kwargs):
+    def protocol(client, client_kex_init: Reader, server_kex_init: Reader, *args, **kwargs):
         """
         Diffie-Hellman Group 1 Key Exchange with SHA-1 Protocol
         """
@@ -59,22 +94,29 @@ class DHGroup1SHA1:
                 string(client.server_banner.rstrip(b'\r\n')) + \
                 string(client_kex_init.message) + \
                 string(server_kex_init.message) + \
-                string(client.host_key.get_key()) + \
+                string(client.hostkey.get_key()) + \
                 mpint(dh_g1.e) + \
                 mpint(dh_g1.f) + \
                 mpint(dh_g1.k)
             
             hash_h = dh_g1.hash(concat)
             client.exchange_hash = hash_h.digest()
-            signature = client.host_key.sign(client.exchange_hash)
+            signature = client.hostkey.sign(client.exchange_hash)
 
             reply = Message()
             reply.write_byte(31)
-            reply.write_string(client.host_key.get_key())
+            reply.write_string(client.hostkey.get_key())
             reply.write_mpint(dh_g1.f)
             reply.write_string(signature)
 
             client.send(reply)
+
+    @property
+    def K(self):
+        """
+        Shared Secret Key
+        """
+        return self.k
 
 class DHGroup14SHA1:
     """Diffie-Hellman Group 14 Key Exchange with SHA-1"""
@@ -94,7 +136,7 @@ class DHGroup14SHA1:
         return SHA1.new(data)
 
     @staticmethod
-    def protocol(client: Client, client_kex_init: Reader, server_kex_init: Reader, *args, **kwargs):
+    def protocol(client, client_kex_init: Reader, server_kex_init: Reader, *args, **kwargs):
         """
         Diffie-Hellman Group 14 Key Exchange with SHA-1 Protocol
         """
@@ -110,39 +152,68 @@ class DHGroup14SHA1:
                 string(client.server_banner.rstrip(b'\r\n')) + \
                 string(client_kex_init.message) + \
                 string(server_kex_init.message) + \
-                string(client.host_key.get_key()) + \
+                string(client.hostkey.get_key()) + \
                 mpint(dh_g1.e) + \
                 mpint(dh_g1.f) + \
                 mpint(dh_g1.k)
             
             hash_h = dh_g1.hash(concat)
             client.exchange_hash = hash_h.digest()
-            signature = client.host_key.sign(client.exchange_hash)
+            signature = client.hostkey.sign(client.exchange_hash)
 
             reply = Message()
             reply.write_byte(31)
-            reply.write_string(client.host_key.get_key())
+            reply.write_string(client.hostkey.get_key())
             reply.write_mpint(dh_g1.f)
             reply.write_string(signature)
 
             client.send(reply)
 
+    @property
+    def K(self):
+        """
+        Shared Secret Key
+        """
+        return self.k
+
 class ECDHcurve25519SHA256:
     """Elliptic Curve Diffie-Hellman Curve25519 Key Exchange with SHA-256
     
     RFC7748#6.1
-    
     """
-    def __init__(self) -> None:
-        self.private_key = None
-        self.private_bytes = None
-        self.public_key = None
-        self.public_bytes = None
-        self.shared_key = None
+    name = b'curve25519-sha256'
+
+    def __init__(self, Q_C) -> None:
+        if len(Q_C) != 32:
+            raise ValueError("Invalid Q_C length")
+        self.Q_C = Q_C
+
+        # Convert Q_C to X25519PublicKey
+        self.peer_public_key = x25519.X25519PublicKey.from_public_bytes(Q_C)
+
+        # Generate 32 bytes of random data
+        self.private_key = x25519.X25519PrivateKey.generate()
+        self.public_key = self.private_key.public_key()
         
+        # Convert private key to bytes
+        self.private_bytes = self.private_key.private_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PrivateFormat.Raw,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+
+        # Convert public key to bytes
+        self.Q_S = self.public_key.public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw
+        )
+
+        self.shared_secret_K = self.private_key.exchange(self.peer_public_key)
+        # self.shared_key_K = int.from_bytes(self.shared_key_K, byteorder='big')
+
     
     @staticmethod
-    def protocol(client: Client, client_kex_init: Reader, server_kex_init: Reader, *args, **kwargs):
+    def protocol(client, client_kex_init: Reader, server_kex_init: Reader):
         """
 
         RFC8731#3.1
@@ -163,63 +234,67 @@ class ECDHcurve25519SHA256:
             if len(Q_C) != 32:
                 raise ValueError("Invalid Q_C length")
             
-            # Convert Q_C to X25519PublicKey
-            peer_public_key = x25519.X25519PublicKey.from_public_bytes(Q_C)
-
-            # Generate 32 bytes of random data
-            private_key = x25519.X25519PrivateKey.generate()
-            public_key = private_key.public_key()
-
-            # Convert private key to bytes
-            private_bytes = private_key.private_bytes(
-                encoding=serialization.Encoding.Raw,
-                format=serialization.PrivateFormat.Raw,
-                encryption_algorithm=serialization.NoEncryption()
-            )
-
-            # Convert public key to bytes
-            Q_S = public_key.public_bytes(
-                encoding=serialization.Encoding.Raw,
-                format=serialization.PublicFormat.Raw
-            )
-            
-            shared_key_K = private_key.exchange(peer_public_key)
-            shared_key_K = int.from_bytes(shared_key_K, byteorder='big')
+            curve25519 = ECDHcurve25519SHA256(Q_C)
+            setattr(client, 'kex', curve25519)
 
             concat = \
                 string(client.client_banner.rstrip(b'\r\n')) + \
                 string(client.server_banner.rstrip(b'\r\n')) + \
                 string(client_kex_init.message) + \
                 string(server_kex_init.message) + \
-                string(client.host_key.get_key()) + \
-                string(Q_C) + \
-                string(Q_S) + \
-                mpint(shared_key_K)
+                string(client.hostkey.get_key()) + \
+                string(curve25519.Q_C) + \
+                string(curve25519.Q_S) + \
+                mpint(curve25519.shared_secret_K)
 
-            hash_h = ECDHcurve25519SHA256.hash(concat)
-            client.exchange_hash = hash_h.digest()
-            signature = client.host_key.sign(client.exchange_hash)
+            hash_h = curve25519.hash(concat)
+            curve25519.exchange_hash_H = hash_h
+            curve25519.session_id = hash_h
+            signature = client.hostkey.sign(curve25519.exchange_hash_H)
 
             reply = Message()
             reply.write_byte(31)
-            reply.write_string(client.host_key.get_key())
-            reply.write_string(Q_S)
+            reply.write_string(client.hostkey.get_key())
+            reply.write_string(curve25519.Q_S)
             reply.write_string(signature)
 
-            client.send(reply)
+            reply_new_keys = Message()
+            reply_new_keys.write_byte(21)
+
+            client.send(reply, reply_new_keys)
+
+            new_keys = client.recv()
+            
+            if new_keys.read_byte() != 21:
+                raise ValueError("Invalid message code")
+
+    @property
+    def K(self):
+        """
+        Shared Secret Key
+        """
+        # return self.shared_secret_K
+        return int.from_bytes(self.shared_secret_K, byteorder='big')
+    
+    @property
+    def H(self):
+        """
+        Shared Hash
+        """
+        return self.exchange_hash_H
 
     @staticmethod
-    def hash(data: bytes) -> SHA256Hash:
-        return SHA256.new(data)
+    def hash(data: bytes):
+        return SHA256.new(data).digest()
 
 
-all_kex_algorithms = {
+supported_algorithms = {
     b'diffie-hellman-group1-sha1': DHGroup1SHA1,
     b'diffie-hellman-group14-sha1': DHGroup14SHA1,
-    b'ecdh-sha2-nistp256': ECDHcurve25519SHA256
+    b'curve25519-sha256': ECDHcurve25519SHA256
 }
 
-def select_algorithm(client: Client, kex_algorithms: List[bytes]) -> KeyExchange:
+def select_algorithm(client_algorithms: List[bytes], server_algorithms: List[bytes]) -> KeyExchange:
     """
     Selects the most secure algorithm from the given list of algorithms.
 
@@ -231,8 +306,6 @@ def select_algorithm(client: Client, kex_algorithms: List[bytes]) -> KeyExchange
     :rtype: class
     """
 
-    for algorithm in kex_algorithms:
-        if algorithm in all_kex_algorithms:
-            return all_kex_algorithms[algorithm]
-    
-    raise NotImplementedError(f"No algortithms to use, not implemented.")
+    for algorithm in client_algorithms:
+        if algorithm in server_algorithms:
+            return supported_algorithms[algorithm]

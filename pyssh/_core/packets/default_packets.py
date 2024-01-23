@@ -1,13 +1,9 @@
-from pyssh._core._version import __version__
-pySSHbanner = b"SSH-2.0-pySSH_" + __version__.encode("utf-8") + b" byEnsarGok" + b"\r\n"
+from pyssh.version import __version__
 
-
-def _get_pyssh_banner():
-    return pySSHbanner
+pyssh_banner = b"SSH-2.0-pySSH_" + __version__.encode("utf-8") + b" byEnsarGok" + b"\r\n"
 
 _key_exchange_init = None
-
-def _get_key_exchange_init():
+def key_exchange_init():
     """
     Key exchange begins by each side sending the following packet:
 

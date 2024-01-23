@@ -1,4 +1,4 @@
-from ._util import mpint, string, uint32, uint64, name_list, byte
+from pyssh.util import mpint, string, uint32, uint64, name_list, byte
 
 from dataclasses import dataclass
 

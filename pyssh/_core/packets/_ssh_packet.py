@@ -1,6 +1,6 @@
 import struct
 
-class _core_packet:   # TODO: Add try-except for struct.unpack, and raise NotImplementedError if it fails
+class ssh_packet:   # TODO: Add try-except for struct.unpack, and raise NotImplementedError if it fails
     """
     Each packet is in the following format:
 
@@ -113,7 +113,7 @@ class _core_packet:   # TODO: Add try-except for struct.unpack, and raise NotImp
         return len(bytes(self))
     
     @staticmethod
-    def _create_packet(_payload, _mac = b""):
+    def create_packet(_payload, _mac = b""):
         """
         Creates a packet from given payload.
         """
@@ -131,6 +131,5 @@ class _core_packet:   # TODO: Add try-except for struct.unpack, and raise NotImp
 
         _random_padding = b"\0" * _len_random_padding
 
-        _packet = _core_packet(_packet_length.to_bytes(4, byteorder="big") + _padding_length.to_bytes(1, byteorder="big") + _payload + _random_padding + _mac)
+        _packet = ssh_packet(_packet_length.to_bytes(4, byteorder="big") + _padding_length.to_bytes(1, byteorder="big") + _payload + _random_padding + _mac)
         return _packet
-
