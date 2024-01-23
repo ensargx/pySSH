@@ -1,12 +1,7 @@
-import pyssh
+from pyssh import pySSH
 
-def main():
-    app = pyssh.pySSH(
-        hostkey_path="~/keys/"
-    )
+app = pySSH(
+    hostkey_path="~/keys/",
+)
 
-    app.run()
-
-
-if __name__ == '__main__':
-    main()
+app.run()

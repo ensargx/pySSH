@@ -7,39 +7,25 @@ from Crypto.Hash import SHA1, SHA256
 
 from pyssh.util import mpint, string
 
+from typing import Protocol
 
-class HostKey(ABC):
+class HostKey(Protocol):
     name: bytes
 
-    @abstractmethod
-    def get_name(self):
-        pass
+    def __init__(self, key_path: str):
+        ...
 
-    @abstractmethod
-    def get_key(self):
-        """Returns the public key of the host."""
-        pass
+    def get_name(self) -> bytes:
+        ...
 
-    @abstractmethod
-    def signature(self):
-        pass
+    def get_key(self) -> bytes:
+        ...
 
-class PubKey(ABC):
-    @abstractmethod
-    def verify(self):
-        pass
-
-    @abstractmethod
-    def get_key(self):
-        pass
-
-class PrivKey(ABC):
-    @abstractmethod
-    def sign(self):
-        pass
+    def sign(self, data: bytes) -> bytes:
+        ...
 
 
-class RSAKey:
+class RSAKey(HostKey):
     name = b"ssh-rsa"
 
     def __init__(self, key_path: str):

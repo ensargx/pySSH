@@ -3,19 +3,17 @@ import os
 from pyssh._core import hostkey
 
 class pySSH:
-    def __init__(self, hostkey_path: str):
+    def __init__(self, hostkey_path: str = './keys/'):
         """
         Initializes the SSH server.
         """
         self.hostkeys = {}
         self.hostkeys_path = hostkey_path
 
-
-    def run(self, port: int = 22):
+    def load_hostkeys(self):
         """
-        Runs the SSH server.
+        Loads the hostkeys from the hostkeys_path.
         """
-        
         # Avaliable hostkeys
         hostkeys = [
             'ssh_host_rsa_key',
@@ -40,6 +38,14 @@ class pySSH:
         if len(self.hostkeys) == 0:
             raise ValueError("No hostkeys found.")
 
+
+    def run(self, port: int = 22):
+        """
+        Runs the SSH server.
+        """
+        
+        # Load hostkeys
+        self.load_hostkeys()
 
         import socket
         import pyssh
