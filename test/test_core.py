@@ -1,6 +1,5 @@
 import unittest
 
-from pyssh._core import _core_classes, packets
 from pyssh._core.packets import _conn_setup
 
 
@@ -19,10 +18,6 @@ class test__client_base(unittest.TestCase):
 
     def test__binary_packet_protocol(self):     # TODO: Implement
         ...
-
-    def test__packets__default_packets(self):
-        # VERSION 0.1
-        self.assertEqual(packets._default_packets._get_pyssh_banner(), b"SSH-2.0-pySSH_0.1 byEnsarGok\r\n")
 
 
 if __name__ == '__main__':

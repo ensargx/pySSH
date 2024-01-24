@@ -61,14 +61,7 @@ def protocol_version_exchange(data: bytes) -> bytes:
     packet protocol, which is described in Section 6.
     """
     
-    try:
-        data = data.decode('utf-8')
-    except:
-        # TODO: Implement
-        raise NotImplementedError("what to do after ")
-        ...
-
-    rex = re.search(r"^SSH-([0-9]\.[0-9])-(.*)( .*)?$",data)
+    rex = re.search(rb"^SSH-([0-9]\.[0-9])-(.*)( .*)?$",data)
 
     if rex is None:
         raise NotImplementedError("what to do after if version packet format is not correct")
@@ -77,7 +70,7 @@ def protocol_version_exchange(data: bytes) -> bytes:
         raise NotImplementedError("what to do after if version is not 2.0")
     
     # return the version string
-    return rex.string.encode('utf-8')
+    return rex.string
     
 
 #################################################################################

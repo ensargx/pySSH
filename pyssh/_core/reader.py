@@ -1,5 +1,3 @@
-from pyssh._core import Message
-
 from typing import List
 
 class Reader:
@@ -96,7 +94,7 @@ class Reader:
         assert self.idx + 1 <= self.len, "Not enough bytes to read byte"
         val = self._message[self.idx]
         self.idx += 1
-        return val
+        return bytes([val])
 
     def read_bytes(self, n: int) -> bytes:
         """

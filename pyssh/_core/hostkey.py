@@ -1,8 +1,7 @@
-from abc import ABC, abstractmethod
 from typing import List
 
 from Crypto.PublicKey import RSA, DSA
-from Crypto.Signature import pkcs1_15
+from Crypto.Signature import pkcs1_15, DSS
 from Crypto.Hash import SHA1, SHA256
 
 from pyssh.util import mpint, string
@@ -47,25 +46,25 @@ class RSAKey(HostKey):
         return b"ssh-rsa"
     
     def get_key(self):
-        return string("ssh-rsa") + mpint(self.public_key.e) + mpint(self.public_key.n)
+        return string(b"ssh-rsa") + mpint(self.public_key.e) + mpint(self.public_key.n)
 
     def sign(self, data: bytes) -> bytes:
         signature = self._pkcs1_15.sign(SHA1.new(data))
-        signature = string("ssh-rsa") + string(signature)
+        signature = string(b"ssh-rsa") + string(signature)
         return signature
 
     # TODO: Delete this
     def sign_sha1(self, data: bytes) -> bytes:
         signature = self._pkcs1_15.sign(SHA1.new(data))
-        signature = string("ssh-rsa") + string(signature)
+        signature = string(b"ssh-rsa") + string(signature)
         return signature
     
     def sign_sha256(self, data: bytes) -> bytes:
         signature = self._pkcs1_15.sign(SHA256.new(data))
-        signature = string("ssh-rsa") + string(signature)
+        signature = string(b"ssh-rsa") + string(signature)
         return signature
 
-
+# TODO: Test this
 class DSAKey(HostKey):
     name = b"ssh-dss"
 
@@ -75,7 +74,7 @@ class DSAKey(HostKey):
 
         self.public_key = DSA.importKey(open(self.public_key_path, "rb").read())
         self.private_key = DSA.importKey(open(self.private_key_path, "rb").read())
-        self._pkcs1_15 = pkcs1_15.new(self.private_key)
+        self._pkcs1_15 = DSS.new(self.private_key, "fips-186-3")
 
         self.p = self.public_key.p
         self.q = self.public_key.q
@@ -87,11 +86,11 @@ class DSAKey(HostKey):
         return b"ssh-dss"
     
     def get_key(self):
-        return string("ssh-dss") + mpint(self.public_key.p) + mpint(self.public_key.q) + mpint(self.public_key.g) + mpint(self.public_key.y)
+        return string(b"ssh-dss") + mpint(self.public_key.p) + mpint(self.public_key.q) + mpint(self.public_key.g) + mpint(self.public_key.y)
 
     def sign(self, data: bytes) -> bytes:
         signature = self._pkcs1_15.sign(SHA1.new(data))
-        signature = string("ssh-dss") + string(signature)
+        signature = string(b"ssh-dss") + string(signature)
         return signature
 
 
@@ -125,7 +124,7 @@ def load_key(path: str):
 
     raise ValueError("Invalid hostkey.")
 
-def select_algorithm(algorithms: List[bytes], server_algorithms: List[bytes]) -> bytes:
+def select_algorithm(algorithms: List[bytes]) -> bytes:
     """
     Selects the first algorithm in the list that is also in the server's list.
 
@@ -134,5 +133,8 @@ def select_algorithm(algorithms: List[bytes], server_algorithms: List[bytes]) ->
     :return: The selected algorithm's name.
     """
     for algorithm in algorithms:
-        if algorithm in server_algorithms:
+        if algorithm in supported_algorithms:
             return algorithm
+
+    raise ValueError("No supported algorithms.")
+

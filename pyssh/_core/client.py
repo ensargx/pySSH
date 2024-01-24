@@ -128,7 +128,7 @@ class Client:
         if kex_algorithm is None:
             raise Exception("No supported key exchange algorithm found.") # TODO: Implement exception
 
-        host_key_algorithm = hostkey.select_algorithm(server_host_key_algorithms, server_algorithms["host_key_algorithms"])
+        host_key_algorithm = hostkey.select_algorithm(server_host_key_algorithms)
         if host_key_algorithm is None:
             raise Exception("No supported host key algorithm found.") # TODO: Implement exception
         self.hostkey = server_hostkeys[host_key_algorithm]

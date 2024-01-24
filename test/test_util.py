@@ -29,10 +29,10 @@ class test__mpint(unittest.TestCase):
         test_case = ()
         self.assertEqual(name_list(test_case), b"\x00\x00\x00\x00")
 
-        test_case = ("zlib",)
+        test_case = (b"zlib",)
         self.assertEqual(name_list(test_case), b"\x00\x00\x00\x04\x7a\x6c\x69\x62")
 
-        test_case = ("zlib", "none")
+        test_case = (b"zlib", b"none")
         self.assertEqual(name_list(test_case), b"\x00\x00\x00\x09\x7a\x6c\x69\x62\x2c\x6e\x6f\x6e\x65")
                                             #      00  00  00  09  7a  6c  69  62  2c  6e  6f  6e  65
 
