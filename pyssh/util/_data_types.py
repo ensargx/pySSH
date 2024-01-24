@@ -1,4 +1,4 @@
-from typing import List, Tuple, Union
+from typing import Iterable
 
 
 def mpint(x: int, signed: bool = True) -> bytes:
@@ -124,7 +124,7 @@ def string(z: bytes) -> bytes:
         return length_bytes + z.encode('utf-8')
     return length_bytes + z
 
-def name_list(l: List[bytes] | Tuple[bytes]) -> bytes:
+def name_list(l: Iterable[bytes]):
     """
     A string containing a comma-separated list of names.  A name-list
     is represented as a uint32 containing its length (number of bytes
@@ -151,7 +151,7 @@ def name_list(l: List[bytes] | Tuple[bytes]) -> bytes:
     # l must be an iterable of strings
     # if z is ("zlib") then l is ["zlib"] BUT python will treat it as a string, not a list
     # if z is ("zlib,none") then l is ["zlib", "none"]
-    return string(','.join(l))
+    return string(b','.join(l))
 
 def byte(x: int = 0) -> bytes:
     """

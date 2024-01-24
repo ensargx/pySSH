@@ -2,7 +2,7 @@ import secrets
 
 from .message import Message
 from .reader import Reader
-from pyssh.util import mpint, string, uint32
+from pyssh.util import mpint, string
 
 from cryptography.hazmat.primitives.asymmetric import x25519
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -20,6 +20,7 @@ class KeyExchange(Protocol):
     And return 'kex' attribute to client which has these variables.
     """
     name: bytes
+    session_id: bytes
 
     @staticmethod
     def protocol(client, client_kex_init: Reader, server_kex_init: Reader) -> 'KeyExchange':
@@ -709,7 +710,7 @@ supported_algorithms = {
     b'diffie-hellman-group-exchange-sha1': DHGroupExchangeSHA1,
     b'diffie-hellman-group14-sha1': DHGroup14SHA1,
     b'diffie-hellman-group1-sha1': DHGroup1SHA1,
-    b'sntrup761x25519-sha512@openssh.com': SNTRUP761x25519SHA512,
+    # b'sntrup761x25519-sha512@openssh.com': SNTRUP761x25519SHA512,
 }
 
 def select_algorithm(client_algorithms: List[bytes], server_algorithms: List[bytes]) -> KeyExchange:

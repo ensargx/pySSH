@@ -7,9 +7,6 @@ from pyssh._core import hostkey
 
 from pyssh._core import packets, kex, encryption
 
-from Crypto.Util import Counter
-from Crypto.Cipher import AES
-
 from typing import Dict, List
 
 class Client:
@@ -31,11 +28,11 @@ class Client:
         self.kex: kex.KeyExchange
         self.session_id = None
         self.client_banner = None
-        self.hostkey: hostkey.HostKey = None
+        self.hostkey: hostkey.HostKey
 
         return self.setup_connection(server_algorithms, server_hostkeys, *args, **kwargs)
     
-    def recv(self, *args, **kwargs) -> Reader:
+    def recv(self) -> Reader:
         data = self.client_sock.recv(4096)
 
         if self.compression is not None:
@@ -87,7 +84,7 @@ class Client:
         self.client_sock.send(raw_data)
 
 
-    def setup_connection(self, server_algorithms, server_hostkeys, *args, **kwargs):
+    def setup_connection(self, server_algorithms, server_hostkeys):
         self.client_sock.send(self.server_banner)
         
         client_banner = self.client_sock.recv(4096)
@@ -106,6 +103,7 @@ class Client:
         client_kex_init = Reader(client_kex_init.payload)
 
         message_code = client_kex_init.read_byte()
+        assert message_code == 20
 
         # İF MESSAGE CODE == 20
         cookie = client_kex_init.read_bytes(16)
@@ -163,10 +161,16 @@ class Client:
 
         data = self.encryption_c2s.decrypt(encrypted_data)
 
+        print(data)
+
+        print("END OF THE TEST!")
+        print("NOW, AUTH WILL START")
+
         packet_len = int.from_bytes(data[:4], "big")
         padding_len = data[4]
         payload = data[5:packet_len]
         random_padding = data[packet_len:packet_len+padding_len]
+        random_padding = random_padding
 
         reader = Reader(payload)
         byte_service_req = reader.read_byte()
