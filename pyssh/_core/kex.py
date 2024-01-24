@@ -2,7 +2,7 @@ import secrets
 
 from .message import Message
 from .reader import Reader
-from pyssh.util import mpint, string, byte
+from pyssh.util import mpint, string
 
 from cryptography.hazmat.primitives.asymmetric import x25519
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -13,9 +13,16 @@ from Crypto.Hash import SHA1, SHA256, SHA384, SHA512
 from typing import List, Protocol
 
 class KeyExchange(Protocol):
-    session_id: bytes
+    """
+    Key Exchange Protocol
+
+    This protocol will get K, H, and session id for the session.
+    And return 'kex' attribute to client which has these variables.
+    """
+    name: bytes
+
     @staticmethod
-    def protocol(client, *args, **kwargs):
+    def protocol(client, client_kex_init: Reader, server_kex_init: Reader) -> 'KeyExchange':
         """
         Key Exchange Protocol.
 
@@ -23,7 +30,7 @@ class KeyExchange(Protocol):
         Also will add 'kex' attribute to client which has these variables.
         session id will be added to client as attribute as well
         """
-        pass
+        ...
 
     @property
     def K(self) -> int:
@@ -47,7 +54,7 @@ class KeyExchange(Protocol):
         ...
 
 
-class DHGroup1SHA1:
+class DHGroup1SHA1(KeyExchange):
     """Diffie-Hellman Group 1 Key Exchange with SHA-1"""
     name = b'diffie-hellman-group1-sha1'
     p = 179769313486231590770839156793787453197860296048756011706444423684197180216158519368947833795864925541502180565485980503646440548199239100050792877003355816639229553136239076508735759914822574862575007425302077447712589550957937778424442426617334727629299387668709205606050270810842907692932019128194467627007
@@ -59,9 +66,11 @@ class DHGroup1SHA1:
         self.y = secrets.randbelow(self.q - 1) + 1
         self.f = pow(self.g, self.y, self.p)
         self.k = pow(self.e, self.y, self.p)
+        self.hash_h: bytes
+        self.session_id: bytes
 
     @staticmethod
-    def protocol(client, client_kex_init: Reader, server_kex_init: Reader, *args, **kwargs):
+    def protocol(client, client_kex_init: Reader, server_kex_init: Reader):
         """
         Diffie-Hellman Group 1 Key Exchange with SHA-1 Protocol
         """
@@ -69,6 +78,7 @@ class DHGroup1SHA1:
 
         message_code = packet.read_byte()
         if message_code == 30:
+
             e = packet.read_mpint()
             dh_g1 = DHGroup1SHA1(e)
             
@@ -83,9 +93,8 @@ class DHGroup1SHA1:
                 mpint(dh_g1.k)
             
             hash_h = dh_g1.hash(concat)
-            client.exchange_hash = hash_h.digest()
-            dh_g1.hash_h = hash_h.digest()
-            dh_g1.session_id = hash_h.digest()
+            dh_g1.hash_h = hash_h
+            dh_g1.session_id = hash_h
             signature = client.hostkey.sign(client.exchange_hash)
 
             reply = Message()
@@ -97,13 +106,15 @@ class DHGroup1SHA1:
             client.send(reply)
 
             return dh_g1
+        else:
+            raise ValueError("Invalid message code")
 
     @property
     def K(self) -> int:
         """
         Shared Secret Key
         """
-        return int.from_bytes(self.k, byteorder='big')
+        return self.k
     
     @staticmethod
     def hash(data: bytes):
@@ -116,7 +127,7 @@ class DHGroup1SHA1:
         """
         return self.hash_h
 
-class DHGroup14SHA1:
+class DHGroup14SHA1(KeyExchange):
     """Diffie-Hellman Group 14 Key Exchange with SHA-1"""
     name = b'diffie-hellman-group14-sha1'
     p = 32317006071311007300338913926423828248817941241140239112842009751400741706634354222619689417363569347117901737909704191754605873209195028853758986185622153212175412514901774520270235796078236248884246189477587641105928646099411723245426622522193230540919037680524235519125679715870117001058055877651038861847280257976054903569732561526167081339361799541336476559160368317896729073178384589680639671900977202194168647225871031411336429319536193471636533209717077448227988588565369208645296636077250268955505928362751121174096972998068410554359584866583291642136218231078990999448652468262416972035911852507045361090559
@@ -128,9 +139,11 @@ class DHGroup14SHA1:
         self.y = secrets.randbelow(self.q - 1) + 1
         self.f = pow(self.g, self.y, self.p)
         self.k = pow(self.e, self.y, self.p)
+        self.hash_h: bytes
+        self.session_id: bytes
 
     @staticmethod
-    def protocol(client, client_kex_init: Reader, server_kex_init: Reader, *args, **kwargs):
+    def protocol(client, client_kex_init: Reader, server_kex_init: Reader):
         """
         Diffie-Hellman Group 14 Key Exchange with SHA-1 Protocol
         """
@@ -138,6 +151,7 @@ class DHGroup14SHA1:
 
         message_code = packet.read_byte()
         if message_code == 30:
+
             e = packet.read_mpint()
             dh_g1 = DHGroup14SHA1(e)
             
@@ -152,9 +166,8 @@ class DHGroup14SHA1:
                 mpint(dh_g1.k)
             
             hash_h = dh_g1.hash(concat)
-            dh_g1.hash_h = hash_h.digest()
-            dh_g1.session_id = hash_h.digest()
-            client.exchange_hash = hash_h.digest()
+            dh_g1.hash_h = hash_h
+            dh_g1.session_id = hash_h
             signature = client.hostkey.sign(client.exchange_hash)
 
             reply = Message()
@@ -166,13 +179,15 @@ class DHGroup14SHA1:
             client.send(reply)
 
             return dh_g1
+        else:
+            raise ValueError("Invalid message code")
 
     @property
     def K(self) -> int:
         """
         Shared Secret Key
         """
-        return int.from_bytes(self.k, byteorder='big')
+        return self.k
     
     @property
     def H(self) -> bytes:
@@ -185,7 +200,7 @@ class DHGroup14SHA1:
     def hash(data: bytes):
         return SHA1.new(data).digest()
 
-class Curve25519SHA256:
+class Curve25519SHA256(KeyExchange):
     """Elliptic Curve Diffie-Hellman Curve25519 Key Exchange with SHA-256
     
     RFC7748#6.1
@@ -196,6 +211,9 @@ class Curve25519SHA256:
         if len(Q_C) != 32:
             raise ValueError("Invalid Q_C length")
         self.Q_C = Q_C
+
+        self.hash_h: bytes
+        self.session_id: bytes
 
         # Convert Q_C to X25519PublicKey
         self.peer_public_key = x25519.X25519PublicKey.from_public_bytes(Q_C)
@@ -218,13 +236,13 @@ class Curve25519SHA256:
         )
 
         self.shared_secret_K = self.private_key.exchange(self.peer_public_key)
-        # self.shared_key_K = int.from_bytes(self.shared_key_K, byteorder='big')
+        # dont know if this is correct to do...
+        self.k = int.from_bytes(self.shared_secret_K, byteorder='big')
 
     
     @staticmethod
     def protocol(client, client_kex_init: Reader, server_kex_init: Reader):
         """
-
         RFC8731#3.1
         Curve25519/448 outputs a binary string X, which is the 32- or 56-byte
         point obtained by scalar multiplication of the other side's public 
@@ -253,12 +271,11 @@ class Curve25519SHA256:
                 string(client.hostkey.get_key()) + \
                 string(curve25519.Q_C) + \
                 string(curve25519.Q_S) + \
-                mpint(curve25519.shared_secret_K)
+                mpint(curve25519.k)
 
-            hash_h = curve25519.hash(concat)
-            curve25519.exchange_hash_H = hash_h
-            curve25519.session_id = hash_h
-            signature = client.hostkey.sign(curve25519.exchange_hash_H)
+            curve25519.hash_h = curve25519.hash(concat)
+            curve25519.session_id = curve25519.hash_h
+            signature = client.hostkey.sign(curve25519.hash_h)
 
             reply = Message()
             reply.write_byte(31)
@@ -277,6 +294,8 @@ class Curve25519SHA256:
                 raise ValueError("Invalid message code")
             
             return curve25519
+        else:
+            raise ValueError("Invalid message code")
 
     @property
     def K(self):
@@ -284,14 +303,14 @@ class Curve25519SHA256:
         Shared Secret Key
         """
         # return self.shared_secret_K
-        return int.from_bytes(self.shared_secret_K, byteorder='big')
+        return self.k
     
     @property
     def H(self):
         """
         Shared Hash
         """
-        return self.exchange_hash_H
+        return self.hash_h
 
     @staticmethod
     def hash(data: bytes):
@@ -308,6 +327,9 @@ class ECDHSHA2NISTP256(KeyExchange):
             raise ValueError("Invalid Q_C length")
         self.Q_C = Q_C
 
+        self.hash_h: bytes
+        self.session_id: bytes
+
         # Convert Q_C to nistp256
         self.peer_public_key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), Q_C)
 
@@ -322,6 +344,7 @@ class ECDHSHA2NISTP256(KeyExchange):
         
         # Calculate shared secret
         self.shared_secret_K = self.private_key.exchange(ec.ECDH(), self.peer_public_key)
+        self.k = int.from_bytes(self.shared_secret_K, byteorder='big')
 
 
     @staticmethod
@@ -329,52 +352,53 @@ class ECDHSHA2NISTP256(KeyExchange):
         packet: Reader = client.recv()
 
         message_code = packet.read_byte()
-        assert message_code == 30
+        if message_code == 30:
 
-        Q_C = packet.read_string()
-        assert len(Q_C) == 65
+            Q_C = packet.read_string()
+            assert len(Q_C) == 65
 
-        ecdh = ECDHSHA2NISTP256(Q_C)
+            ecdh = ECDHSHA2NISTP256(Q_C)
 
-        concat = \
-            string(client.client_banner.rstrip(b'\r\n')) + \
-            string(client.server_banner.rstrip(b'\r\n')) + \
-            string(client_kex_init.message) + \
-            string(server_kex_init.message) + \
-            string(client.hostkey.get_key()) + \
-            string(ecdh.Q_C) + \
-            string(ecdh.Q_S) + \
-            mpint(ecdh.shared_secret_K)
-        
-        hash_h = ecdh.hash(concat)
-        ecdh.exchange_hash_H = hash_h
-        ecdh.session_id = hash_h
-        signature = client.hostkey.sign(ecdh.exchange_hash_H)
+            concat = \
+                string(client.client_banner.rstrip(b'\r\n')) + \
+                string(client.server_banner.rstrip(b'\r\n')) + \
+                string(client_kex_init.message) + \
+                string(server_kex_init.message) + \
+                string(client.hostkey.get_key()) + \
+                string(ecdh.Q_C) + \
+                string(ecdh.Q_S) + \
+                mpint(ecdh.k)
+            
+            ecdh.hash_h = ecdh.hash(concat)
+            ecdh.session_id = ecdh.hash_h
+            signature = client.hostkey.sign(ecdh.hash_h)
 
-        reply = Message()
-        reply.write_byte(31)
-        reply.write_string(client.hostkey.get_key())
-        reply.write_string(ecdh.Q_S)
-        reply.write_string(signature)
+            reply = Message()
+            reply.write_byte(31)
+            reply.write_string(client.hostkey.get_key())
+            reply.write_string(ecdh.Q_S)
+            reply.write_string(signature)
 
-        reply_new_keys = Message()
-        reply_new_keys.write_byte(21)
+            reply_new_keys = Message()
+            reply_new_keys.write_byte(21)
 
-        client.send(reply, reply_new_keys)
+            client.send(reply, reply_new_keys)
 
-        new_keys = client.recv()
+            new_keys = client.recv()
 
-        assert new_keys.read_byte() == 21
+            assert new_keys.read_byte() == 21
 
-        return ecdh
+            return ecdh
+        else:
+            raise ValueError("Invalid message code")
 
     @property
     def K(self) -> int:
-        return int.from_bytes(self.shared_secret_K, byteorder='big')
+        return self.k
 
     @property
     def H(self) -> bytes:
-        return self.exchange_hash_H
+        return self.hash_h
 
     @staticmethod
     def hash(data: bytes) -> bytes:
@@ -387,6 +411,9 @@ class ECDHSHA2NISTP384(KeyExchange):
         if len(Q_C) != 97:
             raise ValueError("Invalid Q_C length")
         self.Q_C = Q_C
+
+        self.hash_h: bytes
+        self.session_id: bytes
 
         # Convert Q_C to nistp384
         self.peer_public_key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP384R1(), Q_C)
@@ -402,6 +429,7 @@ class ECDHSHA2NISTP384(KeyExchange):
         
         # Calculate shared secret
         self.shared_secret_K = self.private_key.exchange(ec.ECDH(), self.peer_public_key)
+        self.k = int.from_bytes(self.shared_secret_K, byteorder='big')
 
 
     @staticmethod
@@ -409,51 +437,52 @@ class ECDHSHA2NISTP384(KeyExchange):
         packet: Reader = client.recv()
 
         message_code = packet.read_byte()
-        assert message_code == 30
+        if message_code == 30:
 
-        Q_C = packet.read_string()
-        assert len(Q_C) == 97
+            Q_C = packet.read_string()
+            assert len(Q_C) == 97
 
-        ecdh = ECDHSHA2NISTP384(Q_C)
+            ecdh = ECDHSHA2NISTP384(Q_C)
 
-        concat = \
-            string(client.client_banner.rstrip(b'\r\n')) + \
-            string(client.server_banner.rstrip(b'\r\n')) + \
-            string(client_kex_init.message) + \
-            string(server_kex_init.message) + \
-            string(client.hostkey.get_key()) + \
-            string(ecdh.Q_C) + \
-            string(ecdh.Q_S) + \
-            mpint(ecdh.shared_secret_K)
+            concat = \
+                string(client.client_banner.rstrip(b'\r\n')) + \
+                string(client.server_banner.rstrip(b'\r\n')) + \
+                string(client_kex_init.message) + \
+                string(server_kex_init.message) + \
+                string(client.hostkey.get_key()) + \
+                string(ecdh.Q_C) + \
+                string(ecdh.Q_S) + \
+                mpint(ecdh.k)
+            
+            ecdh.hash_h = ecdh.hash(concat)
+            ecdh.session_id = ecdh.hash_h
+            signature = client.hostkey.sign(ecdh.hash_h)
+
+            reply = Message()
+            reply.write_byte(31)
+            reply.write_string(client.hostkey.get_key())
+            reply.write_string(ecdh.Q_S)
+            reply.write_string(signature)
+
+            reply_new_keys = Message()
+            reply_new_keys.write_byte(21)
+
+            client.send(reply, reply_new_keys)
+
+            new_keys = client.recv()
+            assert new_keys.read_byte() == 21
+
+            return ecdh
+        else:
+            raise ValueError("Invalid message code")
         
-        hash_h = ecdh.hash(concat)
-        ecdh.exchange_hash_H = hash_h
-        ecdh.session_id = hash_h
-        signature = client.hostkey.sign(ecdh.exchange_hash_H)
-
-        reply = Message()
-        reply.write_byte(31)
-        reply.write_string(client.hostkey.get_key())
-        reply.write_string(ecdh.Q_S)
-        reply.write_string(signature)
-
-        reply_new_keys = Message()
-        reply_new_keys.write_byte(21)
-
-        client.send(reply, reply_new_keys)
-
-        new_keys = client.recv()
-        assert new_keys.read_byte() == 21
-
-        return ecdh
-    
     @property
     def K(self) -> int:
-        return int.from_bytes(self.shared_secret_K, byteorder='big')
+        return self.k
     
     @property
     def H(self) -> bytes:
-        return self.exchange_hash_H
+        return self.hash_h
 
     @staticmethod
     def hash(data: bytes) -> bytes:
@@ -466,6 +495,9 @@ class ECDHSHA2NISTP521(KeyExchange):
         if len(Q_C) != 133:
             raise ValueError("Invalid Q_C length")
         self.Q_C = Q_C
+
+        self.hash_h: bytes
+        self.session_id: bytes
 
         # Convert Q_C to nistp384
         self.peer_public_key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP521R1(), Q_C)
@@ -481,6 +513,7 @@ class ECDHSHA2NISTP521(KeyExchange):
         
         # Calculate shared secret
         self.shared_secret_K = self.private_key.exchange(ec.ECDH(), self.peer_public_key)
+        self.k = int.from_bytes(self.shared_secret_K, byteorder='big')
 
 
     @staticmethod
@@ -488,50 +521,51 @@ class ECDHSHA2NISTP521(KeyExchange):
         packet: Reader = client.recv()
 
         message_code = packet.read_byte()
-        assert message_code == 30
+        if message_code == 30:
 
-        Q_C = packet.read_string()
+            Q_C = packet.read_string()
 
-        ecdh = ECDHSHA2NISTP521(Q_C)
+            ecdh = ECDHSHA2NISTP521(Q_C)
 
-        concat = \
-            string(client.client_banner.rstrip(b'\r\n')) + \
-            string(client.server_banner.rstrip(b'\r\n')) + \
-            string(client_kex_init.message) + \
-            string(server_kex_init.message) + \
-            string(client.hostkey.get_key()) + \
-            string(ecdh.Q_C) + \
-            string(ecdh.Q_S) + \
-            mpint(ecdh.shared_secret_K)
-        
-        hash_h = ecdh.hash(concat)
-        ecdh.exchange_hash_H = hash_h
-        ecdh.session_id = hash_h
-        signature = client.hostkey.sign(ecdh.exchange_hash_H)
+            concat = \
+                string(client.client_banner.rstrip(b'\r\n')) + \
+                string(client.server_banner.rstrip(b'\r\n')) + \
+                string(client_kex_init.message) + \
+                string(server_kex_init.message) + \
+                string(client.hostkey.get_key()) + \
+                string(ecdh.Q_C) + \
+                string(ecdh.Q_S) + \
+                mpint(ecdh.k)
+            
+            ecdh.hash_h = ecdh.hash(concat)
+            ecdh.session_id = ecdh.hash_h
+            signature = client.hostkey.sign(ecdh.hash_h)
 
-        reply = Message()
-        reply.write_byte(31)
-        reply.write_string(client.hostkey.get_key())
-        reply.write_string(ecdh.Q_S)
-        reply.write_string(signature)
+            reply = Message()
+            reply.write_byte(31)
+            reply.write_string(client.hostkey.get_key())
+            reply.write_string(ecdh.Q_S)
+            reply.write_string(signature)
 
-        reply_new_keys = Message()
-        reply_new_keys.write_byte(21)
+            reply_new_keys = Message()
+            reply_new_keys.write_byte(21)
 
-        client.send(reply, reply_new_keys)
+            client.send(reply, reply_new_keys)
 
-        new_keys = client.recv()
-        assert new_keys.read_byte() == 21
+            new_keys = client.recv()
+            assert new_keys.read_byte() == 21
 
-        return ecdh
+            return ecdh
+        else:
+            raise ValueError("Invalid message code")
     
     @property
     def K(self) -> int:
-        return int.from_bytes(self.shared_secret_K, byteorder='big')
+        return self.k
     
     @property
     def H(self) -> bytes:
-        return self.exchange_hash_H
+        return self.hash_h
 
     @staticmethod
     def hash(data: bytes) -> bytes:
@@ -585,3 +619,6 @@ def select_algorithm(client_algorithms: List[bytes], server_algorithms: List[byt
     for algorithm in client_algorithms:
         if algorithm in server_algorithms:
             return supported_algorithms[algorithm]
+
+    raise ValueError("No supported key exchange algorithm found.")
+
