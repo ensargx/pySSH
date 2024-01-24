@@ -2,7 +2,7 @@ import secrets
 
 from .message import Message
 from .reader import Reader
-from pyssh.util import mpint, string
+from pyssh.util import mpint, string, uint32
 
 from cryptography.hazmat.primitives.asymmetric import x25519
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -583,10 +583,88 @@ class ECDHSHA2NISTP521(KeyExchange):
     def hash(data: bytes) -> bytes:
         return SHA512.new(data).digest()
 
-# TODO: implement
+# TODO: TEST!
 class SNTRUP761x25519SHA512(KeyExchange):
     name = b'sntrup761x25519-sha512'
-    ...
+    
+    def __init__(self, Q_C):
+        if len(Q_C) != 133:
+            raise ValueError("Invalid Q_C length")
+        self.Q_C = Q_C
+
+        self.hash_h: bytes
+        self.session_id: bytes
+
+        # Convert Q_C to nistp384
+        self.peer_public_key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP521R1(), Q_C)
+
+        # Generate private key
+        self.private_key = ec.generate_private_key(ec.SECP521R1())
+
+        # Convert public key to bytes
+        self.Q_S = self.private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.X962,
+            format=serialization.PublicFormat.UncompressedPoint
+        )
+        
+        # Calculate shared secret
+        self.shared_secret_K = self.private_key.exchange(ec.ECDH(), self.peer_public_key)
+        self.k = int.from_bytes(self.shared_secret_K, byteorder='big')
+    
+    @staticmethod
+    def protocol(client, client_kex_init: Reader, server_kex_init: Reader):
+        packet: Reader = client.recv()
+
+        message_code = packet.read_byte()
+        if message_code == 30:
+
+            Q_C = packet.read_string()
+
+            ecdh = SNTRUP761x25519SHA512(Q_C)
+
+            concat = \
+                string(client.client_banner.rstrip(b'\r\n')) + \
+                string(client.server_banner.rstrip(b'\r\n')) + \
+                string(client_kex_init.message) + \
+                string(server_kex_init.message) + \
+                string(client.hostkey.get_key()) + \
+                string(ecdh.Q_C) + \
+                string(ecdh.Q_S) + \
+                mpint(ecdh.k)
+            
+            ecdh.hash_h = ecdh.hash(concat)
+            ecdh.session_id = ecdh.hash_h
+            signature = client.hostkey.sign(ecdh.hash_h)
+
+            reply = Message()
+            reply.write_byte(31)
+            reply.write_string(client.hostkey.get_key())
+            reply.write_string(ecdh.Q_S)
+            reply.write_string(signature)
+
+            reply_new_keys = Message()
+            reply_new_keys.write_byte(21)
+
+            client.send(reply, reply_new_keys)
+
+            new_keys = client.recv()
+            assert new_keys.read_byte() == 21
+
+            return ecdh
+        else:
+            raise ValueError("Invalid message code")
+        
+    @property
+    def K(self) -> int:
+        return self.k
+    
+    @property
+    def H(self) -> bytes:
+        return self.hash_h
+    
+    @staticmethod
+    def hash(data: bytes) -> bytes:
+        return SHA512.new(data).digest()
 
 # TODO: implement
 class DHGroupExchangeSHA256(KeyExchange):
@@ -594,8 +672,24 @@ class DHGroupExchangeSHA256(KeyExchange):
     ...
 
 # TODO: implement
-class DHGroup16SHA52(KeyExchange):
-    name = b'diffie-hellman-group16-sha51'
+class DHGroup14SHA512(KeyExchange):
+    name = b'diffie-hellman-group14-sha512'
+    ...
+
+# TODO: implement
+class DHGroup16SHA512(KeyExchange):
+    name = b'diffie-hellman-group16-sha512'
+    ...
+
+# TODO: implement
+class DHGroup18SHA512(KeyExchange):
+    name = b'diffie-hellman-group18-sha512'
+    ...
+
+# TODO: implement
+class DHGroupExchangeSHA1(KeyExchange):
+    name = b'diffie-hellman-group-exchange-sha1'
+    ...
 
 # kex_algorithms string [truncated]:
 #   curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256
@@ -608,12 +702,14 @@ supported_algorithms = {
     b'ecdh-sha2-nistp256': ECDHSHA2NISTP256,
     b'ecdh-sha2-nistp384': ECDHSHA2NISTP384,
     b'ecdh-sha2-nistp521': ECDHSHA2NISTP521,
-    b'sntrup761x25519-sha512': SNTRUP761x25519SHA512,
-    b'sntrup761x25519-sha512@openssh.com': SNTRUP761x25519SHA512,
     b'diffie-hellman-group-exchange-sha256': DHGroupExchangeSHA256,
-    b'diffie-hellman-group16-sha51': DHGroup16SHA52,
-    b'diffie-hellman-group1-sha1': DHGroup1SHA1,
+    b'diffie-hellman-group14-sha512': DHGroup14SHA512,
+    b'diffie-hellman-group16-sha512': DHGroup16SHA512,
+    b'diffie-hellman-group18-sha512': DHGroup18SHA512,
+    b'diffie-hellman-group-exchange-sha1': DHGroupExchangeSHA1,
     b'diffie-hellman-group14-sha1': DHGroup14SHA1,
+    b'diffie-hellman-group1-sha1': DHGroup1SHA1,
+    b'sntrup761x25519-sha512@openssh.com': SNTRUP761x25519SHA512,
 }
 
 def select_algorithm(client_algorithms: List[bytes], server_algorithms: List[bytes]) -> KeyExchange:
