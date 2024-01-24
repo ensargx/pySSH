@@ -31,9 +31,9 @@ class pySSH:
                 key = hostkey.load_key(self.hostkeys_path + filename)
                 self.hostkeys[key.get_name()] = key
             """
-            if filename.endswith(".pub"):
-                filename = filename[:-4]
-                key = hostkey.load_key(self.hostkeys_path + filename)
+            if filename in hostkeys:
+                # Add hostkey to list
+                key = hostkey.load_key(os.path.join(self.hostkeys_path, filename))
                 self.hostkeys[key.get_name()] = key
         # Check if there are any hostkeys
         if len(self.hostkeys) == 0:

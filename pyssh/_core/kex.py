@@ -92,10 +92,9 @@ class DHGroup1SHA1(KeyExchange):
                 mpint(dh_g1.f) + \
                 mpint(dh_g1.k)
             
-            hash_h = dh_g1.hash(concat)
-            dh_g1.hash_h = hash_h
-            dh_g1.session_id = hash_h
-            signature = client.hostkey.sign(client.exchange_hash)
+            dh_g1.hash_h = dh_g1.hash(concat)
+            dh_g1.session_id = dh_g1.hash_h
+            signature = client.hostkey.sign(dh_g1.hash_h)
 
             reply = Message()
             reply.write_byte(31)
@@ -103,7 +102,14 @@ class DHGroup1SHA1(KeyExchange):
             reply.write_mpint(dh_g1.f)
             reply.write_string(signature)
 
-            client.send(reply)
+            new_keys = Message()
+            new_keys.write_byte(21)
+
+            client.send(reply, new_keys)
+
+            new_keys = client.recv()
+            if new_keys.read_byte() != 21:
+                raise ValueError("Invalid message code")
 
             return dh_g1
         else:
@@ -165,10 +171,9 @@ class DHGroup14SHA1(KeyExchange):
                 mpint(dh_g1.f) + \
                 mpint(dh_g1.k)
             
-            hash_h = dh_g1.hash(concat)
-            dh_g1.hash_h = hash_h
-            dh_g1.session_id = hash_h
-            signature = client.hostkey.sign(client.exchange_hash)
+            dh_g1.hash_h = dh_g1.hash(concat)
+            dh_g1.session_id = dh_g1.hash_h
+            signature = client.hostkey.sign(dh_g1.hash_h)
 
             reply = Message()
             reply.write_byte(31)
@@ -176,7 +181,14 @@ class DHGroup14SHA1(KeyExchange):
             reply.write_mpint(dh_g1.f)
             reply.write_string(signature)
 
-            client.send(reply)
+            new_keys = Message()
+            new_keys.write_byte(21)
+
+            client.send(reply, new_keys)
+
+            new_keys = client.recv()
+            if new_keys.read_byte() != 21:
+                raise ValueError("Invalid message code")
 
             return dh_g1
         else:
