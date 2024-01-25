@@ -66,7 +66,7 @@ def protocol_version_exchange(data: bytes) -> bytes:
     if rex is None:
         raise NotImplementedError("what to do after if version packet format is not correct")
     
-    if rex.group(1) != "2.0":
+    if rex.group(1) != b"2.0":
         raise NotImplementedError("what to do after if version is not 2.0")
     
     # return the version string

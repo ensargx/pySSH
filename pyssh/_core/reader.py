@@ -82,7 +82,7 @@ class Reader:
         self.idx += l
         return list(val.split(b","))
 
-    def read_byte(self) -> bytes:
+    def read_byte(self) -> int:
         """
         Represents an arbitrary length binary string.  Strings are allowed
         to contain arbitrary binary data, including null characters and
@@ -94,7 +94,7 @@ class Reader:
         assert self.idx + 1 <= self.len, "Not enough bytes to read byte"
         val = self._message[self.idx]
         self.idx += 1
-        return bytes([val])
+        return val
 
     def read_bytes(self, n: int) -> bytes:
         """
