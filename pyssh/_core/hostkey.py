@@ -1,6 +1,6 @@
 from typing import List
 
-from Crypto.PublicKey import RSA, DSA
+from Crypto.PublicKey import RSA, DSA, ECC
 from Crypto.Signature import pkcs1_15, DSS
 from Crypto.Hash import SHA1, SHA256
 
@@ -94,9 +94,30 @@ class DSAKey(HostKey):
         return signature
 
 
-class ECDSA(HostKey):
-    ...
+class ECDSASHA2NISTP256(HostKey):
+    name = b"ecdsa-sha2-nistp256"
 
+    def __init__(self, key_path: str):
+        self.private_key_path = key_path
+        self.public_key_path = key_path + ".pub"
+
+        self.private_key = ECC.import_key(open(self.private_key_path, "rb").read())
+        self.public_key = ECC.import_key(open(self.public_key_path, "rb").read())
+
+        self.signer = DSS.new(self.private_key, "fips-186-3")
+
+    def sign(self, data: bytes) -> bytes:
+        signature = self.signer.sign(SHA256.new(data))
+        signature = string(b"ecdsa-sha2-nistp256") + string(signature)
+        return signature
+
+    def get_name(self):
+        return b"ecdsa-sha2-nistp256"
+
+    def get_key(self):
+        base_64 = "AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1MjEAAACFBABLjngCoWcOJNC6CVQZBnMOdMfRivZAFog0HhDilwNx1vg0jpD3gtWf2lGPiqiUUdsdg4J5uPPMdrD3jt98onPQWwGIRjPiur0NeO/a0slZFtrUtYIGvHM8ZIOylfQ91lYW1FGUADx3GJPeuuQw5Q+GQC7TXTeSi7VfDhNBpgb9ZINXkQ=="
+        import base64
+        return base64.b64decode(base_64)
 
 class ED25519(HostKey):
     ...
@@ -104,6 +125,7 @@ class ED25519(HostKey):
 
 supported_algorithms = {
     b"ssh-rsa": RSAKey,
+    b"ecdsa-sha2-nistp256": ECDSASHA2NISTP256,
 }
 
 def load_key(path: str):
@@ -118,11 +140,12 @@ def load_key(path: str):
 
     for key_type in supported_algorithms.values():
         try:
+            print("DEBUG: Trying", key_type)
             return key_type(path)
         except ValueError:
             continue
 
-    raise ValueError("Invalid hostkey.")
+    raise ValueError("Invalid hostkey:", path)
 
 def select_algorithm(algorithms: List[bytes]) -> bytes:
     """

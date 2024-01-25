@@ -1,5 +1,7 @@
 from pyssh.version import __version__
 
+from pyssh._core import kex
+
 pyssh_banner = b"SSH-2.0-pySSH_" + __version__.encode("utf-8") + b" byEnsarGok" + b"\r\n"
 
 _key_exchange_init = None
@@ -175,13 +177,12 @@ def key_exchange_init():
         b'diffie-hellman-group14-sha1',
     ])
     
-    from pyssh._core import kex
     algorithms = b",".join(name for name in kex.supported_algorithms.keys())
 
     _payload += len(algorithms).to_bytes(4, byteorder="big") # kex_algorithms length
     _payload += algorithms
 
-    algorithms = b"ssh-rsa,ssh-dss"
+    algorithms = b"ssh-rsa,ecdsa-sha2-nistp256"
     _payload += len(algorithms).to_bytes(4, byteorder="big") # server_host_key_algorithms length
     _payload += algorithms
 
