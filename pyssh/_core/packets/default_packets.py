@@ -1,6 +1,6 @@
 from pyssh.version import __version__
 
-from pyssh._core import kex
+from pyssh._core import hostkey, kex
 
 pyssh_banner = b"SSH-2.0-pySSH_" + __version__.encode("utf-8") + b" byEnsarGok" + b"\r\n"
 
@@ -182,7 +182,7 @@ def key_exchange_init():
     _payload += len(algorithms).to_bytes(4, byteorder="big") # kex_algorithms length
     _payload += algorithms
 
-    algorithms = b"ssh-rsa,ecdsa-sha2-nistp256"
+    algorithms = b",".join([name for name in hostkey.supported_algorithms.keys()])
     _payload += len(algorithms).to_bytes(4, byteorder="big") # server_host_key_algorithms length
     _payload += algorithms
 

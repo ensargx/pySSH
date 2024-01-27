@@ -34,6 +34,7 @@ class pySSH:
             if filename in hostkeys:
                 # Add hostkey to list
                 key = hostkey.load_key(os.path.join(self.hostkeys_path, filename))
+                print("DEBUG: Loaded hostkey: ", key.get_name())
                 self.hostkeys[key.get_name()] = key
         # Check if there are any hostkeys
         print("DEBUG: Hostkeys: ", self.hostkeys)
@@ -60,7 +61,7 @@ class pySSH:
         server_kex_algorithms = [name for name in kex.supported_algorithms.keys()]
         server_host_key_algorithms = [
             b"ssh-rsa",
-            b"ecdsa-sha2-nistp256",
+            # b"ecdsa-sha2-nistp256",
         ]
         server_encryption_algorithms_c2s = [
             b"aes128-ctr",
