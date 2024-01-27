@@ -123,7 +123,7 @@ class ED25519(HostKey):
 
 supported_algorithms = {
     b"ssh-rsa": RSAKey,
-    b"ecdsa-sha2-nistp256": ECDSASHA2NISTP256,
+    # b"ecdsa-sha2-nistp256": ECDSASHA2NISTP256,
 }
 
 def load_key(path: str):
@@ -143,7 +143,7 @@ def load_key(path: str):
         except ValueError:
             continue
 
-    raise ValueError("Invalid hostkey:", path)
+    raise ValueError("Hostkey not supported:", path)
 
 def select_algorithm(algorithms: List[bytes]) -> bytes:
     """
