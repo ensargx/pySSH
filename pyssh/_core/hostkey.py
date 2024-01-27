@@ -115,9 +115,7 @@ class ECDSASHA2NISTP256(HostKey):
         return b"ecdsa-sha2-nistp256"
 
     def get_key(self):
-        base_64 = "AAAAE2VjZHNhLXNoYTItbmlzdHA1MjEAAAAIbmlzdHA1MjEAAACFBABLjngCoWcOJNC6CVQZBnMOdMfRivZAFog0HhDilwNx1vg0jpD3gtWf2lGPiqiUUdsdg4J5uPPMdrD3jt98onPQWwGIRjPiur0NeO/a0slZFtrUtYIGvHM8ZIOylfQ91lYW1FGUADx3GJPeuuQw5Q+GQC7TXTeSi7VfDhNBpgb9ZINXkQ=="
-        import base64
-        return base64.b64decode(base_64)
+        return string(b"ecdsa-sha2-nistp256") + string(b"nistp256") + string(self.public_key.export_key(format="raw"))
 
 class ED25519(HostKey):
     ...
