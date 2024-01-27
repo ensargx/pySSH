@@ -2,7 +2,7 @@ from socket import socket
 from .message import Message
 from .reader import Reader
 
-from pyssh.util import mpint
+from pyssh.util import mpint, uint32
 from pyssh._core import hostkey
 
 from pyssh._core import packets, kex, encryption
@@ -161,7 +161,23 @@ class Client:
 
         data = self.encryption_c2s.decrypt(encrypted_data)
 
-        print(data)
+        # Control the mac
+        # Mac algorithm is hmac-sha1
+        import hmac
+        import hashlib
+
+        sequence_number = 5
+        sequence_number = uint32(sequence_number)
+        print(sequence_number)
+
+        hmac_c2s = hmac.new(integrity_key_c2s[:20], digestmod=hashlib.sha1)
+        hmac_c2s.update(sequence_number + data)
+        hmac_c2s = hmac_c2s.digest()
+
+        if hmac_c2s != mac_sent:
+            print("MAC verification failed, received:", mac_sent, "expected:", hmac_c2s)
+        else:
+            print("MAC verification success!")
 
         print("END OF THE TEST!")
         print("NOW, AUTH WILL START")
@@ -178,15 +194,6 @@ class Client:
 
         print(byte_service_req)
         print(service_req)
-
-        # controll mac
-        from Crypto.Hash import HMAC, SHA1
-        mac = HMAC.new(integrity_key_c2s[:20], digestmod=SHA1)
-        mac.update(data)
-        mac = mac.digest()
-
-        print(mac == mac_sent)
-
 
         # return self.loop(*args, **kwargs)
     
