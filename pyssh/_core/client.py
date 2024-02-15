@@ -161,29 +161,19 @@ class Client:
         self.encryption_c2s = encryption_c2s(encryption_key_c2s, initial_iv_c2s)
         self.encryption_s2c = encryption_s2c(encryption_key_s2c, initial_iv_s2c)
 
-        data = self.recv()
-
-        print("END OF THE TEST!")
-        print("NOW, AUTH WILL START")
-
-        packet_len = int.from_bytes(data[:4], "big")
-        padding_len = data[4]
-        payload = data[5:packet_len]
-        random_padding = data[packet_len:packet_len+padding_len]
-        random_padding = random_padding
-
-        reader = Reader(payload)
-        byte_service_req = reader.read_byte()
-        service_req = reader.read_string()
-
-        print(byte_service_req)
-        print(service_req)
-
-        # return self.loop(*args, **kwargs)
+        return self.loop()
     
-    def loop(self, *args, **kwargs):
-        
+    def loop(self):
         """
-        Client loop.
+        Client loop. All Encrypted and MAC'd packets are handled here.
+        The loop will start after the key exchange is done.
         """
+        data = self.recv()
+        service_request = data.read_byte()
+        if service_request == 5:
+            self.send(Message(packets.service_accept("ssh-userauth")))
+            self.auth()
+        else:
+            raise NotImplementedError("Service request not implemented.")
+
         pass
