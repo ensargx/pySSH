@@ -29,11 +29,14 @@ class Client:
         self.session_id = None
         self.client_banner = None
         self.hostkey: hostkey.HostKey
+        self._sequence_number_c2s = 0
+        self._sequence_number_s2c = 0
 
         return self.setup_connection(server_algorithms, server_hostkeys, *args, **kwargs)
     
     def recv(self) -> Reader:
         data = self.client_sock.recv(4096)
+        self._sequence_number_c2s += 1
 
         if self.compression is not None:
             data = self.compression.decompress(data)
