@@ -1,7 +1,7 @@
 
 import hmac
 
-from typing import Protocol
+from typing import Protocol, List
 
 
 class MAC(Protocol):
@@ -50,3 +50,19 @@ class HMACSHA1(MAC):
     
     def parse(self, data):
         return data[:-20], data[-20:]
+    
+supperted_algorithms = {
+        b"hmac-sha1": HMACSHA1,
+    }
+
+def select_algorithm(algorithms: List[bytes], server_algorithms: List[bytes]):
+    """
+    Selects an encryption algorithm to use for the communication.
+
+    :param algorithms_client: List of algorithms supported by the client.
+    """ 
+
+    # Select the first algorithm that is supported by both client and server.
+    for algorithm in algorithms:
+        if algorithm in server_algorithms:
+            return supperted_algorithms[algorithm]

@@ -146,7 +146,13 @@ class Client:
         encryption_c2s = encryption.select_algorithm(encryption_algorithms_client_to_server, server_algorithms["encryption_algorithms_c2s"])
         if encryption_c2s is None:
             raise Exception("No supported encryption algorithm found.")
-
+        
+        mac_s2c = mac.select_algorithm(mac_algorithms_server_to_client, server_algorithms["mac_algorithms_s2c"])
+        if mac_s2c is None:
+            raise Exception("No supported MAC algorithm found.")
+        mac_c2s = mac.select_algorithm(mac_algorithms_client_to_server, server_algorithms["mac_algorithms_c2s"])
+        if mac_c2s is None:
+            raise Exception("No supported MAC algorithm found.")
 
         self.kex = kex_algorithm.protocol(self, client_kex_init=client_kex_init, server_kex_init=server_kex_init)
 
@@ -161,6 +167,10 @@ class Client:
         self.encryption_c2s = encryption_c2s(encryption_key_c2s, initial_iv_c2s)
         self.encryption_s2c = encryption_s2c(encryption_key_s2c, initial_iv_s2c)
 
+        # MAC is now enabled
+        self.mac_c2s = mac_c2s(integrity_key_c2s)
+        self.mac_s2c = mac_s2c(integrity_key_s2c)
+
         return self.loop()
     
     def loop(self):
@@ -170,10 +180,6 @@ class Client:
         """
         data = self.recv()
         service_request = data.read_byte()
-        if service_request == 5:
-            self.send(Message(packets.service_accept("ssh-userauth")))
-            self.auth()
-        else:
-            raise NotImplementedError("Service request not implemented.")
-
-        pass
+        service_name = data.read_string()
+        print(service_request, service_name)
+        return
