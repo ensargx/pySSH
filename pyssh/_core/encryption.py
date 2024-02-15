@@ -23,6 +23,15 @@ class Encryption(Protocol):
         """
         ...
 
+class EncryptionNone(Encryption):
+    def __init__(self, encryption_key: bytes = b"", initial_iv: bytes = b""):
+        pass
+
+    def encrypt(self, plaintext: bytes) -> bytes:
+        return plaintext
+
+    def decrypt(self, ciphertext: bytes) -> bytes:
+        return ciphertext
 
 class AES128CTR:
     def __init__(self, encryption_key: bytes, initial_iv: bytes):

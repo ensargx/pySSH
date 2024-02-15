@@ -21,7 +21,7 @@ class Client:
         self.client_sock = client_sock
         self.server_banner = packets.pyssh_banner
 
-        self.encryption_c2s = None
+        self.encryption_c2s: encryption.Encryption = encryption.EncryptionNone()
         self.encryption_s2c = None
         self.mac_c2s: mac.MAC = mac.MACNone()
         self.mac_s2c = None
@@ -32,25 +32,42 @@ class Client:
         self.hostkey: hostkey.HostKey
         self._sequence_number_c2s = 0
         self._sequence_number_s2c = 0
+        self._recv_buffer = b''
 
         return self.setup_connection(server_algorithms, server_hostkeys, *args, **kwargs)
     
     def recv(self) -> Reader:
-        data = self.client_sock.recv(4096)
-        self._sequence_number_c2s = (self._sequence_number_c2s + 1) % (2**32) 
+        """
+        Receives 1 packet from the client socket.
+        Stores the rest of the data in self._recv_buffer.
+        if self._recv_buffer is not empty, it will be used instead of receiving new data.
+        """
+        if self._recv_buffer:
+            data = self._recv_buffer
+            self._recv_buffer = b''
+        else:
+            data = self.client_sock.recv(4096)
+        self._sequence_number_c2s = (self._sequence_number_c2s + 1) % (2**32)
 
-        data, mac_sent = self.mac_c2s.parse(data)
+        _pack_len = self.encryption_c2s.decrypt(data[:4])
+        _pack_len_int = int.from_bytes(_pack_len, "big")
+        _pack_len_int += self.mac_c2s.mac_len
 
-        if self.compression is not None:
-            data = self.compression.decompress(data)
+        if _pack_len_int + 4 > len(data):
+            self._recv_buffer = data[_pack_len_int + 4:]
+        _data = data[4:_pack_len_int + 4]
 
-        if self.encryption_c2s is not None:
-            data = self.encryption_c2s.decrypt(data)
+        _data, mac_sent = self.mac_c2s.parse(_data)
+        _data = self.encryption_c2s.decrypt(_data)
 
-        if not self.mac_c2s.verify(uint32(self._sequence_number_c2s) + data, mac_sent):
+        _data = _pack_len + _data
+
+        if not self.mac_c2s.verify(uint32(self._sequence_number_c2s) + _data, mac_sent):
             raise Exception("MAC verification failed.")
 
-        data = packets.ssh_packet(data)
+        # TODO: Implement compression.. maybe
+
+        data = packets.ssh_packet(_data)
         return Reader(data.payload)
     
     def send(self, *messages: Message, **kwargs):
