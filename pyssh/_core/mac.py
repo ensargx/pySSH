@@ -5,6 +5,7 @@ from typing import Protocol, List
 
 
 class MAC(Protocol):
+    mac_len: int
     def __init__(self, iv):
         ...
 
