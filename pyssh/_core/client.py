@@ -5,7 +5,7 @@ from .reader import Reader
 from pyssh.util import mpint, uint32
 from pyssh._core import hostkey
 
-from pyssh._core import packets, kex, encryption
+from pyssh._core import packets, kex, encryption, mac
 
 from typing import Dict, List
 
@@ -23,7 +23,8 @@ class Client:
 
         self.encryption_c2s = None
         self.encryption_s2c = None
-        self.mac = None
+        self.mac_c2s: mac.MAC = mac.MACNone()
+        self.mac_s2c = None
         self.compression = None
         self.kex: kex.KeyExchange
         self.session_id = None
@@ -36,7 +37,9 @@ class Client:
     
     def recv(self) -> Reader:
         data = self.client_sock.recv(4096)
-        self._sequence_number_c2s += 1
+        self._sequence_number_c2s = (self._sequence_number_c2s + 1) % (2**32) 
+
+        data, mac_sent = self.mac_c2s.parse(data)
 
         if self.compression is not None:
             data = self.compression.decompress(data)
@@ -44,8 +47,8 @@ class Client:
         if self.encryption_c2s is not None:
             data = self.encryption_c2s.decrypt(data)
 
-        if self.mac is not None:
-            self.mac.verify(data)
+        if not self.mac_c2s.verify(uint32(self._sequence_number_c2s) + data, mac_sent):
+            raise Exception("MAC verification failed.")
 
         data = packets.ssh_packet(data)
         return Reader(data.payload)
@@ -75,7 +78,7 @@ class Client:
             if self.encryption_s2c is not None:
                 data = self.encryption_s2c.encrypt(data, **kwargs)
 
-            if self.mac is not None:
+            if self.mac_s2c is not None:
                 self.mac.sign(data, **kwargs)
 
             if self.compression is not None:
@@ -158,28 +161,7 @@ class Client:
         self.encryption_c2s = encryption_c2s(encryption_key_c2s, initial_iv_c2s)
         self.encryption_s2c = encryption_s2c(encryption_key_s2c, initial_iv_s2c)
 
-        raw_data = self.client_sock.recv(4096)
-        encrypted_data = raw_data[:-20]
-        mac_sent = raw_data[-20:]
-
-        data = self.encryption_c2s.decrypt(encrypted_data)
-
-        # Control the mac
-        # Mac algorithm is hmac-sha1
-        import hmac
-        import sys
-
-        sequence_number = uint32(3)
-
-        hmac_c2s = hmac.new(integrity_key_c2s[:20], digestmod='sha1')
-        hmac_c2s.update(sequence_number + data)
-        hmac_c2s = hmac_c2s.digest()
-
-        assert len(hmac_c2s) == 20, "HMAC length is not 20"
-        assert len(mac_sent) == 20, "MAC length is not 20"
-
-        if hmac_c2s != mac_sent:
-            print("MAC verification failed, received:", mac_sent, "expected:", hmac_c2s)
+        data = self.recv()
 
         print("END OF THE TEST!")
         print("NOW, AUTH WILL START")
