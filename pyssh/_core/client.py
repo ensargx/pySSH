@@ -52,24 +52,23 @@ class Client:
 
         _pack_len = self.encryption_c2s.decrypt(data[:4])
         _pack_len_int = int.from_bytes(_pack_len, "big")
-        _pack_len_int += self.mac_c2s.mac_len
 
-        if _pack_len_int + 4 > len(data):
+        if _pack_len_int + self.mac_c2s.mac_len + 4 > len(data):
             self._recv_buffer = data[_pack_len_int + 4:]
-        _data = data[4:_pack_len_int + 4]
+        _data = data[4:_pack_len_int + self.mac_c2s.mac_len + 4]
 
         _data, mac_sent = self.mac_c2s.parse(_data)
         _data = self.encryption_c2s.decrypt(_data)
 
-        _data = _pack_len + _data
+        data = _pack_len + _data
 
-        if not self.mac_c2s.verify(uint32(self._sequence_number_c2s) + _data, mac_sent):
+        if not self.mac_c2s.verify(uint32(self._sequence_number_c2s) + data, mac_sent):
             raise Exception("MAC verification failed.")
 
         # TODO: Implement compression.. maybe
 
-        data = packets.ssh_packet(_data)
-        return Reader(data.payload)
+        pack = packets.ssh_packet(data)
+        return Reader(pack.payload)
     
     def send(self, *messages: Message, **kwargs):
         """
@@ -227,6 +226,7 @@ class Client:
                 reply.write_byte(6)
                 reply.write_string(b"ssh-userauth")
                 self.send(reply)
+                data = self.recv()
             else:
                 raise Exception("Unknown service request.")
         return

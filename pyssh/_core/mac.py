@@ -33,17 +33,18 @@ class MACNone(MAC):
         return data, b""
 
 class HMACSHA1(MAC):
-    mac_len = 20
     def __init__(self, iv):
         if len(iv) > 20:
             iv = iv[:20]
         elif len(iv) < 20:
             raise ValueError("IV must be at least 20 bytes long.")
+        self._iv = iv
         self.mac = hmac.new(iv, digestmod='sha1')
 
-    def verify(self, data, mac):
+    def verify(self, data, mac): # TODO: wtf happening
+        return hmac.new(self._iv, data, digestmod='sha1').digest() == mac
         self.mac.update(data)
-        return self.mac.digest() == mac
+        return self.mac.digest() == mac #TODO: use mac.compare_digest / hexdigest
 
     def sign(self, data):
         self.mac.update(data)
@@ -51,6 +52,10 @@ class HMACSHA1(MAC):
     
     def parse(self, data):
         return data[:-20], data[-20:]
+    
+    @property
+    def mac_len(self):  # TODO: maybe change mac_len name to digest_size
+        return self.mac.digest_size 
     
 supperted_algorithms = {
         b"hmac-sha1": HMACSHA1,
