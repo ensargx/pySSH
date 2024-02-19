@@ -47,6 +47,7 @@ class HMACSHA1(MAC):
         return self.mac.digest() == mac #TODO: use mac.compare_digest / hexdigest
 
     def sign(self, data):
+        return hmac.new(self._iv, data, digestmod='sha1').digest()
         self.mac.update(data)
         return self.mac.digest()
     
