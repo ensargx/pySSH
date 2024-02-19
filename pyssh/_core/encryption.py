@@ -4,7 +4,7 @@ from Crypto.Cipher import AES
 from Crypto.Util import Counter
 
 class Encryption(Protocol):
-    
+    cipher_block_size: int
     def __init__(self, encryption_key: bytes, initial_iv: bytes):
         """
         Initializes the encryption algorithm.
@@ -24,6 +24,7 @@ class Encryption(Protocol):
         ...
 
 class EncryptionNone(Encryption):
+    cipher_block_size = 8
     def __init__(self, encryption_key: bytes = b"", initial_iv: bytes = b""):
         pass
 
@@ -34,6 +35,7 @@ class EncryptionNone(Encryption):
         return ciphertext
 
 class AES128CTR:
+    cipher_block_size = 16
     def __init__(self, encryption_key: bytes, initial_iv: bytes):
         self.ctr = Counter.new(128, initial_value=int.from_bytes(initial_iv[:16], "big"))
         self.cipher = AES.new(encryption_key[:16], AES.MODE_CTR, counter=self.ctr)

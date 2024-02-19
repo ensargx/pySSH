@@ -2,12 +2,13 @@ from socket import socket
 from .message import Message
 from .reader import Reader
 
-from pyssh.util import mpint, uint32
+from pyssh.util import mpint, uint32, byte
 from pyssh._core import hostkey
 
 from pyssh._core import packets, kex, encryption, mac
 
 from typing import Dict, List
+import secrets
 
 class Client:
     def __init__(
@@ -22,9 +23,9 @@ class Client:
         self.server_banner = packets.pyssh_banner
 
         self.encryption_c2s: encryption.Encryption = encryption.EncryptionNone()
-        self.encryption_s2c = None
+        self.encryption_s2c: encryption.Encryption = encryption.EncryptionNone()
         self.mac_c2s: mac.MAC = mac.MACNone()
-        self.mac_s2c = None
+        self.mac_s2c: mac.MAC = mac.MACNone()
         self.compression = None
         self.kex: kex.KeyExchange
         self.session_id = None
@@ -90,18 +91,33 @@ class Client:
         raw_data = b''
         # For each message in messages:
         for message in messages:
-            data = message.payload
+            self._sequence_number_s2c = (self._sequence_number_s2c + 1) % (2**32)
 
-            if self.encryption_s2c is not None:
-                data = self.encryption_s2c.encrypt(data, **kwargs)
+            _payload = message.payload
+            _cipher_block_size = self.encryption_s2c.cipher_block_size
 
-            if self.mac_s2c is not None:
-                self.mac.sign(data, **kwargs)
+            # Calculate padding length (RFC 4253, Section 6.1)
+            # s.t. lentgh of (packet_length || padding_length || payload || random padding)
+            # is a multiple of the cipher block size or 8, whichever is larger.
+            # There MUST be at least four bytes of padding. The padding SHOULD consist of random bytes.
+            # The maximum amount of padding is 255 bytes.
+            _len_packet = len(_payload) + 5 # +1 for padding_length, +4 for packet_length
+            _len_padding = _cipher_block_size - (_len_packet % _cipher_block_size)
+            while _len_padding < 4: # maybe a lil bit math?
+                _len_padding += _cipher_block_size
+            
+            _padding = secrets.token_bytes(_len_padding)
+            _packet_length = _len_packet + _len_padding - 4 # -4 for padding_length itself
 
-            if self.compression is not None:
-                data = self.compression.compress(data, **kwargs)
+            _packet = uint32(_packet_length) + byte(_len_padding) + _payload + _padding
+            _mac = self.mac_s2c.sign(uint32(self._sequence_number_s2c) + _packet)
 
-            packet = packets.ssh_packet.create_packet(data, **kwargs)
+            if self.compression is not None: # actually, compression is not implemented yet
+                _packet = self.compression.compress(_packet) # TODO: Implement compression
+
+            _packet_enc = self.encryption_s2c.encrypt(_packet)
+            packet = _packet_enc + _mac
+
             raw_data += bytes(packet)
 
         self.client_sock.send(raw_data)
@@ -194,9 +210,23 @@ class Client:
         """
         Client loop. All Encrypted and MAC'd packets are handled here.
         The loop will start after the key exchange is done.
+
+            SSH_MSG_DISCONNECT             1
+            SSH_MSG_IGNORE                 2
+            SSH_MSG_UNIMPLEMENTED          3
+            SSH_MSG_DEBUG                  4
+            SSH_MSG_SERVICE_REQUEST        5
+            SSH_MSG_SERVICE_ACCEPT         6
         """
         data = self.recv()
         service_request = data.read_byte()
         service_name = data.read_string()
-        print(service_request, service_name)
+        if service_request == 5:
+            if service_name == b"ssh-userauth":
+                reply = Message()
+                reply.write_byte(6)
+                reply.write_string(b"ssh-userauth")
+                self.send(reply)
+            else:
+                raise Exception("Unknown service request.")
         return
