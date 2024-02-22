@@ -1,7 +1,6 @@
 import os
 
-from pyssh._core import hostkey
-from pyssh._core import kex
+from pyssh._core import kex, hostkey, mac 
 
 class pySSH:
     def __init__(self, hostkey_path: str = './keys/'):
@@ -73,12 +72,9 @@ class pySSH:
         server_encryption_algorithms_s2c = [
             b"aes128-ctr",
         ]
-        server_mac_algorithms_c2s = [
-            b"hmac-sha1",
-        ]
-        server_mac_algorithms_s2c = [
-            b"hmac-sha1",
-        ]
+        server_mac_algorithms_c2s = [name for name in mac.supported_algorithms.keys()] 
+        server_mac_algorithms_s2c = [name for name in mac.supported_algorithms.keys()] 
+
         server_compression_algorithms_c2s = [
             b"none",
         ]

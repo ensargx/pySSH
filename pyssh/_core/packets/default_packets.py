@@ -1,6 +1,6 @@
 from pyssh.version import __version__
 
-from pyssh._core import hostkey, kex
+from pyssh._core import hostkey, kex, mac
 
 pyssh_banner = b"SSH-2.0-pySSH_" + __version__.encode("utf-8") + b" byEnsarGok" + b"\r\n"
 
@@ -194,11 +194,11 @@ def key_exchange_init():
     _payload += len(algorithms).to_bytes(4, byteorder="big") # encryption_algorithms_server_to_client length
     _payload += algorithms
 
-    algorithms = b"umac-64-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha1-etm@openssh.com,umac-64@openssh.com,umac-128@openssh.com,hmac-sha2-256,hmac-sha2-512,hmac-sha1"
+    algorithms = b",".join(name for name in mac.supported_algorithms.keys())
     _payload += len(algorithms).to_bytes(4, byteorder="big") # mac_algorithms_client_to_server length
     _payload += algorithms
 
-    algorithms = b"umac-64-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,hmac-sha1-etm@openssh.com,umac-64@openssh.com,umac-128@openssh.com,hmac-sha2-256,hmac-sha2-512,hmac-sha1"
+    algorithms = b",".join(name for name in mac.supported_algorithms.keys())
     _payload += len(algorithms).to_bytes(4, byteorder="big") # mac_algorithms_server_to_client length
     _payload += algorithms
 

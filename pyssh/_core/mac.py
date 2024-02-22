@@ -64,7 +64,7 @@ class HMACSHA1(MAC):
     def mac_len(self):  # TODO: maybe change mac_len name to digest_size
         return self.mac.digest_size 
     
-supperted_algorithms = {
+supported_algorithms = {
         b"hmac-sha1": HMACSHA1,
     }
 
@@ -78,4 +78,4 @@ def select_algorithm(algorithms: List[bytes], server_algorithms: List[bytes]):
     # Select the first algorithm that is supported by both client and server.
     for algorithm in algorithms:
         if algorithm in server_algorithms:
-            return supperted_algorithms[algorithm]
+            return supported_algorithms[algorithm]
