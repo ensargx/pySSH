@@ -1,11 +1,10 @@
 
 import hmac
 
-from typing import Protocol, List
+from typing import Protocol, List, Tuple
 
 
 class MAC(Protocol):
-    mac_len: int
     def __init__(self, iv):
         ...
 
@@ -15,11 +14,14 @@ class MAC(Protocol):
     def sign(self, data) -> bytes:
         ...
     
-    def parse(self, data) -> bytes:
+    def parse(self, data) -> Tuple[bytes, bytes]:
+        ...
+
+    @property
+    def mac_len(self) -> int:
         ...
 
 class MACNone(MAC):
-    mac_len = 0
     def __init__(self, iv = None):
         return
 
@@ -31,6 +33,10 @@ class MACNone(MAC):
     
     def parse(self, data):
         return data, b""
+
+    @property
+    def mac_len(self):
+        return 0
 
 class HMACSHA1(MAC):
     def __init__(self, iv):
