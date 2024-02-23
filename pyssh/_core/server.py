@@ -57,6 +57,10 @@ class pySSH:
 
         sock.listen(1)
 
+        """
+        TODO: server algorithms should be configurable s.t. the user can specify which algorithms to use.
+              And server should create the algorithms based on the user's configuration and algorithms supported.
+        """
             # Demo server algorithms
         server_kex_algorithms = [name for name in kex.supported_algorithms.keys()]
         server_host_key_algorithms = [
