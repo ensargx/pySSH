@@ -229,7 +229,7 @@ class Client:
         reply.write_string(b"ssh-userauth")         # SSH_MSG_SERVICE_ACCEPT
         self.send(reply)
         # SERVICE-REQUEST ends
-        
+
         # USERAUTH_REQUEST starts                   # RFC 4252
         data = self.recv()
         userauth_request = data.read_byte()
@@ -264,3 +264,35 @@ class Client:
         channel_open_confirmation.write_uint32(32768)
         self.send(channel_open_confirmation)
         # CHANNEL_OPEN ends
+
+        # PSOUDE-TERMINAL starts                    # RFC 4254  Section 6.2
+        data = self.recv()
+        channel_request = data.read_byte()
+        recipient_channel = data.read_uint32()
+        ptty_req = data.read_string()
+        want_reply = data.read_boolean()
+        term_env = data.read_string()
+        terminal_width_chars = data.read_uint32()
+        terminal_height_rows = data.read_uint32()
+        terminal_width_pixels = data.read_uint32()
+        terminal_height_pixels = data.read_uint32()
+        terminal_modes = data.read_string()
+        assert channel_request == 98
+        assert ptty_req == b"pty-req"
+        print("[DEBUG]: want_reply:", want_reply)
+        print("[DEBUG]: term_env:", term_env)
+        print("[DEBUG]: terminal_width_chars:", terminal_width_chars)
+        print("[DEBUG]: terminal_height_rows:", terminal_height_rows)
+        print("[DEBUG]: terminal_width_pixels:", terminal_width_pixels)
+        print("[DEBUG]: terminal_height_pixels:", terminal_height_pixels)
+        print("[DEBUG]: terminal_modes:", terminal_modes)
+        channel_success = Message()
+        channel_success.write_byte(99)
+        channel_success.write_uint32(recipient_channel)
+        self.send(channel_success)
+        # PSOUDE-TERMINAL ends
+
+        # SHELL starts                             # RFC 4254  Section 6.5
+        data = self.recv()
+        print("[DEBUG]: SHELL starts")
+        print("[DEBUG]: data:", data.message)
