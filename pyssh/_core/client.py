@@ -293,6 +293,12 @@ class Client:
         # PSOUDE-TERMINAL ends
 
         # SHELL starts                             # RFC 4254  Section 6.5
+        prompt = b">>> "
+        shell_data = Message()
+        shell_data.write_byte(94)
+        shell_data.write_uint32(0)
+        shell_data.write_string(prompt)
+        self.send(shell_data)
         data = self.recv()
         print("[DEBUG]: SHELL starts")
         print("[DEBUG]: data:", data.message)
