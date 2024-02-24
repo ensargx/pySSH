@@ -217,16 +217,50 @@ class Client:
             SSH_MSG_SERVICE_REQUEST        5
             SSH_MSG_SERVICE_ACCEPT         6
         """
+
+        # SERVICE-REQUEST starts                    # RFC 4253
         data = self.recv()
         service_request = data.read_byte()
         service_name = data.read_string()
-        if service_request == 5:
-            if service_name == b"ssh-userauth":
-                reply = Message()
-                reply.write_byte(6)
-                reply.write_string(b"ssh-userauth")
-                self.send(reply)
-                data = self.recv()
-            else:
-                raise Exception("Unknown service request.")
-        return
+        assert service_request == 5                 # SSH_MSG_SERVICE_REQUEST
+        assert service_name == b"ssh-userauth"      # SSH_MSG_SERVICE_REQUEST
+        reply = Message()
+        reply.write_byte(6)                         # SSH_MSG_SERVICE_ACCEPT
+        reply.write_string(b"ssh-userauth")         # SSH_MSG_SERVICE_ACCEPT
+        self.send(reply)
+        # SERVICE-REQUEST ends
+        
+        # USERAUTH_REQUEST starts                   # RFC 4252
+        data = self.recv()
+        userauth_request = data.read_byte()
+        user_name = data.read_string()
+        print("[DEBUG]: username:", user_name)
+        service_name = data.read_string()
+        method_name = data.read_string()
+        assert userauth_request == 50
+        assert service_name == b"ssh-connection"    # SSH_MSG_USERAUTH_REQUEST
+        assert method_name == b"none"
+        userauth_accept = Message()
+        userauth_accept.write_byte(52)              # SSH_MSG_USERAUTH_SUCCESS
+        self.send(userauth_accept)
+        # USERAUTH_REQUEST ends
+
+        # CHANNEL_OPEN starts                       # RFC 4254  Section 5.1
+        data = self.recv()
+        channel_open = data.read_byte()
+        channel_type = data.read_string()
+        sender_channel = data.read_uint32()
+        initial_window_size = data.read_uint32()
+        maximum_packet_size = data.read_uint32()
+        assert channel_open == 90
+        assert channel_type == b"session"
+        assert initial_window_size != 0
+        assert maximum_packet_size != 32768
+        channel_open_confirmation = Message()
+        channel_open_confirmation.write_byte(91)
+        channel_open_confirmation.write_uint32(sender_channel)
+        channel_open_confirmation.write_uint32(0)
+        channel_open_confirmation.write_uint32(32768)
+        channel_open_confirmation.write_uint32(32768)
+        self.send(channel_open_confirmation)
+        # CHANNEL_OPEN ends
