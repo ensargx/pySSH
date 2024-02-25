@@ -254,8 +254,9 @@ class Client:
         maximum_packet_size = data.read_uint32()
         assert channel_open == 90
         assert channel_type == b"session"
-        assert initial_window_size != 0
-        assert maximum_packet_size != 32768
+        print("[DEBUG]: sender_channel:", sender_channel)
+        print("[DEBUG]: initial_window_size:", initial_window_size)
+        print("[DEBUG]: maximum_packet_size:", maximum_packet_size)
         channel_open_confirmation = Message()
         channel_open_confirmation.write_byte(91)
         channel_open_confirmation.write_uint32(sender_channel)
