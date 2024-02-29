@@ -294,12 +294,29 @@ class Client:
         # PSOUDE-TERMINAL ends
 
         # SHELL starts                             # RFC 4254  Section 6.5
+        data = self.recv()
+        print("[DEBUG]: SHELL starts")
+        channel_request = data.read_byte()
+        assert channel_request == 98
+        recipient_channel = data.read_uint32()
+        shell_req = data.read_string()
+        want_reply = data.read_boolean()
+        assert shell_req == b"shell"
+        print("[DEBUG]: want_reply:", want_reply)
         prompt = b">>> "
         shell_data = Message()
         shell_data.write_byte(94)
         shell_data.write_uint32(0)
         shell_data.write_string(prompt)
         self.send(shell_data)
-        data = self.recv()
-        print("[DEBUG]: SHELL starts")
-        print("[DEBUG]: data:", data.message)
+        # SHELL ends
+
+        # send shell prompt
+        foo = b"asdasd"
+        shell_data = Message()
+        shell_data.write_byte(94)
+        shell_data.write_uint32(0)
+        shell_data.write_string(foo)
+        self.send(shell_data)
+
+        print("[DEBUG]: loop ends")
