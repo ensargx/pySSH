@@ -319,6 +319,14 @@ class Client:
             assert message_code == 94
             recipient_channel = data.read_uint32()
             char = data.read_string()
+            if char == b"q":
+                # send disconnect
+                disconnect = Message()
+                disconnect.write_byte(1)
+                disconnect.write_uint32(0)
+                disconnect.write_string(b"Bye")
+                self.send(disconnect)
+                break
             print("[DEBUG]: char:", char)
             reply = Message()
             reply.write_byte(94)
