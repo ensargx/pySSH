@@ -53,8 +53,8 @@ class Client:
         _pack_len = self.encryption_c2s.decrypt(data[:4])
         _pack_len_int = int.from_bytes(_pack_len, "big")
 
-        if _pack_len_int + self.mac_c2s.mac_len + 4 > len(data):
-            self._recv_buffer = data[_pack_len_int + 4:]
+        if _pack_len_int + self.mac_c2s.mac_len + 4 < len(data):
+            self._recv_buffer = data[_pack_len_int + self.mac_c2s.mac_len + 4:]
         _data = data[4:_pack_len_int + self.mac_c2s.mac_len + 4]
 
         _data, mac_sent = self.mac_c2s.parse(_data)
