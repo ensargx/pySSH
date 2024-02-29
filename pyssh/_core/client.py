@@ -311,12 +311,17 @@ class Client:
         self.send(shell_data)
         # SHELL ends
 
-        # send shell prompt
-        foo = b"asdasd"
-        shell_data = Message()
-        shell_data.write_byte(94)
-        shell_data.write_uint32(0)
-        shell_data.write_string(foo)
-        self.send(shell_data)
-
         print("[DEBUG]: loop ends")
+
+        while 1:
+            data = self.recv()
+            message_code = data.read_byte()
+            assert message_code == 94
+            recipient_channel = data.read_uint32()
+            char = data.read_string()
+            print("[DEBUG]: char:", char)
+            reply = Message()
+            reply.write_byte(94)
+            reply.write_uint32(0)
+            reply.write_string(char)
+            self.send(reply)
