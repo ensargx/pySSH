@@ -353,16 +353,22 @@ class Client:
             for char in chars:
                 char = byte(char)
                 if char == b"\x03":
+                    print("[DEBUG]: CTRL+C")
                     break
                 elif char == b"\x1b":
+                    print("[DEBUG]: ESCAPE")
                     pass
                 elif char == b"q":
                     disc = True
                     break
                 elif char == b"\x7f":
+                    # delete key
+                    print("[DEBUG]: DELETE")
                     line = line[:-1]
+                    send_chars(b"\x1b[D" + terminal.CLEAR_LINE + b"\r" + prompt + line)
                 elif char == b"\r":
                     # send the message to other clients ...
+                    print("[DEBUG]: send message:", line)
                     received = user_name + b": " + line
                     to_sent = terminal.CLEAR_LINE + b"\r" + received + terminal.NEWLINE + prompt
                     send_chars(to_sent)
