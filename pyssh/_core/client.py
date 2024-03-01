@@ -301,9 +301,25 @@ class Client:
         recipient_channel = data.read_uint32()
         shell_req = data.read_string()
         want_reply = data.read_boolean()
-        assert shell_req == b"shell"
+        while shell_req == b"env":
+            print("[DEBUG]: env request")
+            env_name = data.read_string()
+            env_value = data.read_string()
+            print("[DEBUG]: env_name:", env_name)
+            print("[DEBUG]: env_value:", env_value)
+            channel_success = Message()
+            channel_success.write_byte(99)
+            channel_success.write_uint32(recipient_channel)
+            self.send(channel_success)
+            data = self.recv()
+            channel_request = data.read_byte()
+            assert channel_request == 98
+            recipient_channel = data.read_uint32()
+            shell_req = data.read_string()
+            want_reply = data.read_boolean()
+        assert shell_req == b"shell", "Expected shell request, got: " + shell_req.decode("utf-8")
         print("[DEBUG]: want_reply:", want_reply)
-        prompt = b">>> "
+        prompt = user_name + b": "
         shell_data = Message()
         shell_data.write_byte(94)
         shell_data.write_uint32(0)
@@ -313,23 +329,100 @@ class Client:
 
         print("[DEBUG]: loop ends")
 
-        while 1:
+        terminal = TerminalEmulator()
+
+        def send_chars(char: bytes):
+            message = Message()
+            message.write_byte(94)
+            message.write_uint32(0)
+            message.write_string(char)
+            self.send(message)
+
+        def recv_chars():
             data = self.recv()
             message_code = data.read_byte()
             assert message_code == 94
             recipient_channel = data.read_uint32()
             char = data.read_string()
-            if char == b"q":
-                # send disconnect
-                disconnect = Message()
-                disconnect.write_byte(1)
-                disconnect.write_uint32(0)
-                disconnect.write_string(b"Bye")
-                self.send(disconnect)
+            return char
+
+        line = b""
+        disc = False
+        while not disc:
+            chars = recv_chars()
+            for char in chars:
+                char = byte(char)
+                if char == b"\x03":
+                    break
+                elif char == b"\x1b":
+                    pass
+                elif char == b"q":
+                    disc = True
+                    break
+                elif char == b"\x7f":
+                    line = line[:-1]
+                elif char == b"\r":
+                    # send the message to other clients ...
+                    received = user_name + b": " + line
+                    to_sent = terminal.CLEAR_LINE + b"\r" + received + terminal.NEWLINE + prompt
+                    send_chars(to_sent)
+                    line = b""
+                elif char == b"t":
+                    # testing purposes
+                    received = b"alice: How are you?"
+                    # to sent : clear line + carraige return + prompt + received + line
+                    to_sent = terminal.CLEAR_LINE + b"\r" + received + terminal.NEWLINE + prompt + line
+                    send_chars(to_sent)
+                else:
+                    line += char
+                    send_chars(char)
+                    print("[DEBUG]: received char:", char)
+
+            if char and char == b"\x03":
                 break
-            print("[DEBUG]: char:", char)
-            reply = Message()
-            reply.write_byte(94)
-            reply.write_uint32(0)
-            reply.write_string(char)
-            self.send(reply)
+        print("[DEBUG]: loop ends")
+
+        # CHANNEL_CLOSE starts                      # RFC 4254  Section 5.#!/usr/bin/env python3
+        bye = Message()
+        bye.write_byte(97)
+        bye.write_uint32(0)
+        self.send(bye)
+        print("[DEBUG]: CHANNEL_CLOSE ends")
+        # CHANNEL_CLOSE ends
+                    
+
+class TerminalEmulator:
+    NEWLINE = b"\r\n"
+    CLEAR_SCREEN = b"\x1b[2J"
+    CLEAR_LINE = b"\x1b[2K"
+    CURSOR_HOME = b"\x1b[H"
+    CURSOR_UP = b"\x1b[A"
+    CURSOR_DOWN = b"\x1b[B"
+    CURSOR_LEFT = b"\x1b[D"
+    CURSOR_RIGHT = b"\x1b[C"
+    CURSOR_SAVE = b"\x1b[s"
+    CURSOR_RESTORE = b"\x1b[u"
+    CURSOR_HIDE = b"\x1b[?25l"
+    CURSOR_SHOW = b"\x1b[?25h"
+    DELETE_KEY = b"\x7f"
+
+    @staticmethod
+    def parse_chars(chars: bytes):
+        # check for escape sequences
+        if chars[:2] == b"\x1b[":
+            if chars[-1] == b"A":
+                return TerminalEmulator.CURSOR_UP
+            elif chars[-1] == b"B":
+                return TerminalEmulator.CURSOR_DOWN
+            elif chars[-1] == b"C":
+                return TerminalEmulator.CURSOR_RIGHT
+            elif chars[-1] == b"D":
+                return TerminalEmulator.CURSOR_LEFT
+            elif chars[-1] == b"J":
+                return TerminalEmulator.CLEAR_SCREEN
+            elif chars[-1] == b"K":
+                return TerminalEmulator.CLEAR_LINE
+            elif chars[-1] == b"H":
+                return TerminalEmulator.CURSOR_HOME
+
+        return chars
