@@ -34,6 +34,7 @@ class Client:
         self._sequence_number_c2s = 0
         self._sequence_number_s2c = 0
         self._recv_buffer = b''
+        self.username: bytes
 
         return self.setup_connection(server_algorithms, server_hostkeys, *args, **kwargs)
     
@@ -121,6 +122,8 @@ class Client:
 
         self.client_sock.send(raw_data)
 
+    def handler(self, _client):
+        self._client = _client
 
     def setup_connection(self, server_algorithms, server_hostkeys):
         self.client_sock.send(self.server_banner)
@@ -203,21 +206,9 @@ class Client:
         self.mac_c2s = mac_c2s(integrity_key_c2s)
         self.mac_s2c = mac_s2c(integrity_key_s2c)
 
-        return self.loop()
-    
-    def loop(self):
-        """
-        Client loop. All Encrypted and MAC'd packets are handled here.
-        The loop will start after the key exchange is done.
+        return self.user_auth()
 
-            SSH_MSG_DISCONNECT             1
-            SSH_MSG_IGNORE                 2
-            SSH_MSG_UNIMPLEMENTED          3
-            SSH_MSG_DEBUG                  4
-            SSH_MSG_SERVICE_REQUEST        5
-            SSH_MSG_SERVICE_ACCEPT         6
-        """
-
+    def user_auth(self):
         # SERVICE-REQUEST starts                    # RFC 4253
         data = self.recv()
         service_request = data.read_byte()
@@ -234,6 +225,7 @@ class Client:
         data = self.recv()
         userauth_request = data.read_byte()
         user_name = data.read_string()
+        self.username = user_name
         print("[DEBUG]: username:", user_name)
         service_name = data.read_string()
         method_name = data.read_string()
@@ -245,6 +237,27 @@ class Client:
         self.send(userauth_accept)
         # USERAUTH_REQUEST ends
 
+    def get_send(self):
+        def send_char(char: bytes):
+            message = Message()
+            message.write_byte(94)
+            message.write_uint32(0)
+            message.write_string(char)
+            self.send(message)
+        return send_char
+    
+    def loop(self):
+        """
+        Client loop. All Encrypted and MAC'd packets are handled here.
+        The loop will start after the key exchange is done.
+
+            SSH_MSG_DISCONNECT             1
+            SSH_MSG_IGNORE                 2
+            SSH_MSG_UNIMPLEMENTED          3
+            SSH_MSG_DEBUG                  4
+            SSH_MSG_SERVICE_REQUEST        5
+            SSH_MSG_SERVICE_ACCEPT         6
+        """
         # CHANNEL_OPEN starts                       # RFC 4254  Section 5.1
         data = self.recv()
         channel_open = data.read_byte()
@@ -319,7 +332,7 @@ class Client:
             want_reply = data.read_boolean()
         assert shell_req == b"shell", "Expected shell request, got: " + shell_req.decode("utf-8")
         print("[DEBUG]: want_reply:", want_reply)
-        prompt = user_name + b": "
+        prompt = self.username + b": "
         shell_data = Message()
         shell_data.write_byte(94)
         shell_data.write_uint32(0)
@@ -350,6 +363,8 @@ class Client:
         disc = False
         while not disc:
             chars = recv_chars()
+            self._client.handler(chars)
+            continue
             for char in chars:
                 char = byte(char)
                 if char == b"\x03":

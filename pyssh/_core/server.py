@@ -40,6 +40,13 @@ class pySSH:
         if len(self.hostkeys) == 0:
             raise ValueError("No hostkeys found.")
 
+    def client(self, cls):
+        """
+        Decorator for adding a client to the server.
+        """
+        # Add send method for the client
+        self.client_cls = cls
+        return cls
 
     def run(self, port: int = 22):
         """
@@ -102,7 +109,20 @@ class pySSH:
         }
 
         from pyssh._core.client import Client
-        client_sock, addr = sock.accept()
-        print('Connection from', addr)
-        client = Client(client_sock, server_algorithms, self.hostkeys)        
-
+        while 1:
+            client_sock, addr = sock.accept()
+            print('Connection from', addr)
+            client = Client(client_sock, server_algorithms, self.hostkeys)
+            _send = client.get_send()
+            _terminal = None
+            _username = client.username
+            client_cls = self.client_cls(_send, _username, _terminal)
+            print("DEBUG: client_cls: ", client_cls)
+            print("DEBUG: client_cls.handler: ", client_cls.handler)
+            client.handler(client_cls)
+            # client loop
+            import threading
+            client_thread = threading.Thread(target=client.loop)
+            client_thread.start()
+        print("Server closed")
+        
