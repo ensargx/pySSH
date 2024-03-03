@@ -245,6 +245,16 @@ class Client:
             message.write_string(char)
             self.send(message)
         return send_char
+
+    def get_recv(self):
+        def recv_char():
+            data = self.recv()
+            message_code = data.read_byte()
+            assert message_code == 94
+            recipient_channel = data.read_uint32()
+            char = data.read_string()
+            return char
+        return recv_char
     
     def loop(self):
         """
@@ -332,12 +342,6 @@ class Client:
             want_reply = data.read_boolean()
         assert shell_req == b"shell", "Expected shell request, got: " + shell_req.decode("utf-8")
         print("[DEBUG]: want_reply:", want_reply)
-        prompt = self.username + b": "
-        shell_data = Message()
-        shell_data.write_byte(94)
-        shell_data.write_uint32(0)
-        shell_data.write_string(prompt)
-        self.send(shell_data)
         # SHELL ends
 
         print("[DEBUG]: loop ends")
@@ -358,6 +362,20 @@ class Client:
             recipient_channel = data.read_uint32()
             char = data.read_string()
             return char
+
+        # Wellcome message if client implemented 
+        if hasattr(self._client, "wellcome_message"):
+            # if wellcome_message is a function
+            if callable(self._client.wellcome_message):
+                wellcome = self._client.wellcome_message()
+            else:
+                wellcome = self._client.wellcome_message
+            # send wellcome message to the client
+            message = Message()
+            message.write_byte(94)
+            message.write_uint32(0)
+            message.write_string(wellcome)
+            self.send(message)
 
         line = b""
         disc = False
