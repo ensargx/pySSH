@@ -116,7 +116,8 @@ class pySSH:
             _send = client.get_send()
             _terminal = None
             _username = client.username
-            client_cls = self.client_cls(_send, _username, _terminal)
+            _recv = client.get_recv()
+            client_cls = self.client_cls(_send, _recv, _username, _terminal)
             print("DEBUG: client_cls: ", client_cls)
             print("DEBUG: client_cls.handler: ", client_cls.handler)
             client.handler(client_cls)
