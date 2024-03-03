@@ -13,10 +13,12 @@ class Client:
     def __init__(self, send, recv, username, terminal):
         self.send = send
         self.recv = recv
-        self.username = username
         self.terminal = terminal
         self.all_clients.append(self)
         self.line = b''
+
+        # username is bold
+        self.username = b'\x1b[1m' + username + b'\x1b[0m'
 
     def wellcome_message(self):
         return b"Welcome to the chat room, " + self.username + b"!\r\n" + self.username + b": "
