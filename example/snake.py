@@ -12,6 +12,7 @@ app = pySSH(
 
 @app.client
 class Client:
+    all_players = []
     def __init__(self, send, recv, username, terminal):
         self.send = send
         self.recv = recv
@@ -21,7 +22,9 @@ class Client:
         self.snake = [(0, 0)]
         self.food = (5, 5)
         self.direction = (1, 0)
+        self.tmp_dir = (1, 0)
         self.isPlaying = True
+        self.all_players.append(self)
 
         # start game thread
         self.game_thread = threading.Thread(target=self.run)
@@ -36,6 +39,12 @@ class Client:
             self.direction = (1, 0)
         elif data == b'\x1b[D': # left
             self.direction = (-1, 0)
+        elif data == b' ': # space
+            if self.direction == (0, 0):
+                self.direction = self.tmp_dir
+            else:
+                self.tmp_dir = self.direction
+                self.direction = (0, 0)
         elif data == b'\x03': # Ctrl+C
             self.send(b'Goodbye!')
             self.isPlaying = False
@@ -64,8 +73,10 @@ class Client:
         # draw food
         x, y = self.food
         self.send(b'\x1b[' + str(y).encode() + b';' + str(x).encode() + b'H#')
-        # draw score
-        self.send(b'\x1b[12;0H' + b'Score: ' + str(self.snake_len).encode())
+        # draw score top right
+        for i, player in enumerate(self.all_players):
+            # move cursor to top right + i line
+            self.send(b'\x1b[' + str(i).encode() + b';10H' + player.username + b': ' + str(player.snake_len).encode())
 
     def run(self):
         # thread for sending data to client
