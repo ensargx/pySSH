@@ -11,11 +11,16 @@ app = pySSH(
 class Auth:
     @staticmethod
     def none(username: bytes):
+        Auth.check_name(username)
         return True
 
     @staticmethod
     def password(username: bytes, password: bytes):
         return True
+
+    @staticmethod
+    def check_name(username: bytes):
+        print("Checking username:", username)
 
 @app.auth
 def password(username: bytes, password: bytes):
