@@ -116,7 +116,7 @@ class Reader:
         byte value 0, and the value TRUE by the byte value 1.
         """
         val = self.read_byte()
-        if val == b"\x00":
+        if val == 0:
             return False
         return True
 
