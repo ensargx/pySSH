@@ -9,6 +9,7 @@ class pySSH:
         """
         self.hostkeys = {}
         self.hostkeys_path = hostkey_path
+        self.auth_handler = {}
 
     def load_hostkeys(self):
         """
@@ -47,6 +48,56 @@ class pySSH:
         # Add send method for the client
         self.client_cls = cls
         return cls
+
+    def auth(self, cls):
+        """
+        Decorator for adding auth methods to the server.
+
+        The auth handler can be a class or a function.
+        if the auth handler is a class, it can define auth names as methods.
+        i.e.:
+
+        class AuthHandler:
+            @staticmethod 
+            def none(username: bytes) -> bool:
+                AuthHandler.check_name(username)
+                return True
+
+            @staticmethod
+            def check_name(username: bytes):
+                # Some db check ... 
+                print("Username: ", username)
+
+        The auth handler can also be a function.
+        i.e.:
+
+        def none(username: bytes) -> bool:
+            print("Username: ", username)
+            return True
+
+        The auth handler must return a boolean value indicating if the authentication was successful or not.
+        """
+        type_ = getattr(getattr(cls, '__class__', None), '__name__', None)
+        # if type_ is function:
+        if type_ == 'function':
+            self.auth_handler[cls.__name__] = cls
+            return cls
+
+        # if type_ is type (class):
+        if type_ == 'type':
+            auth_methods = [
+                'none',
+                'password',
+                'publickey',
+                'hostbased',
+                'keyboard_interactive',
+            ]
+            for method in auth_methods:
+                if hasattr(cls, method):
+                    self.auth_handler[method] = getattr(cls, method)
+            return cls
+
+        raise ValueError("Invalid auth handler, must be a function or class.")
 
     def run(self, port: int = 22):
         """

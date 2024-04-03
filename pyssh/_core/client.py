@@ -232,9 +232,59 @@ class Client:
         assert userauth_request == 50
         assert service_name == b"ssh-connection"    # SSH_MSG_USERAUTH_REQUEST
         assert method_name == b"none"
-        userauth_accept = Message()
-        userauth_accept.write_byte(52)              # SSH_MSG_USERAUTH_SUCCESS
-        self.send(userauth_accept)
+        print("[DEBUG]: method_name:", method_name)
+
+        userauth_failure = Message()
+        userauth_failure.write_byte(51)             # SSH_MSG_USERAUTH_FAILURE
+        userauth_failure.write_name_list([b"publickey", b"password"])
+        userauth_failure.write_byte(0)
+        self.send(userauth_failure)
+
+        auth_banner = Message()
+        auth_banner.write_byte(53)                  # SSH_MSG_USERAUTH_BANNER
+        auth_banner.write_string(b"Welcome to pyssh!")
+        auth_banner.write_string(b"")
+        self.send(auth_banner)
+
+        data = self.recv()
+        userauth_request = data.read_byte()
+        user_name = data.read_string()
+        service_name = data.read_string()
+        method_name = data.read_string()
+        assert userauth_request == 50
+        assert service_name == b"ssh-connection"    # SSH_MSG_USERAUTH_REQUEST
+        while method_name != b"password":
+            print("[DEBUG]: method_name:", method_name)
+            userauth_failure = Message()
+            userauth_failure.write_byte(51)         # SSH_MSG_USERAUTH_FAILURE
+            userauth_failure.write_name_list([b"publickey", b"password"])
+            userauth_failure.write_byte(0)
+            self.send(userauth_failure)
+            data = self.recv()
+            userauth_request = data.read_byte()
+            user_name = data.read_string()
+            service_name = data.read_string()
+            method_name = data.read_string()
+            assert userauth_request == 50
+            assert service_name == b"ssh-connection"
+        print("[DEBUG]: method_name:", method_name)
+
+        boolean_as_byte = data.read_byte()
+        print("[DEBUG]: boolean_as_byte:", boolean_as_byte)
+        print(boolean_as_byte == 0)
+        print(boolean_as_byte)
+        password = data.read_string()
+        print("[DEBUG]: password:", password)
+
+        if password == b"password":
+            userauth_success = Message()
+            userauth_success.write_byte(52)         # SSH_MSG_USERAUTH_SUCCESS
+            self.send(userauth_success)
+        else:
+            userauth_failure = Message()
+            userauth_failure.write_byte(51)
+            self.send(userauth_failure)
+
         # USERAUTH_REQUEST ends
 
     def get_send(self):

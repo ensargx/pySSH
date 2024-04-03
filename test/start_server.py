@@ -7,6 +7,20 @@ app = pySSH(
     hostkey_path = hostkey_path
 )
 
+@app.auth
+class Auth:
+    @staticmethod
+    def none(username: bytes):
+        return True
+
+    @staticmethod
+    def password(username: bytes, password: bytes):
+        return True
+
+@app.auth
+def password(username: bytes, password: bytes):
+    return True
+
 @app.client
 class Client:
     _all_clients = []
