@@ -164,6 +164,13 @@ class pySSH:
             client_sock, addr = sock.accept()
             print('Connection from', addr)
             client = Client(client_sock, server_algorithms, self.hostkeys)
+            # setup complete, auth required
+            if client.user_auth(self.auth_handler) is False:
+                print("[DEBUG] User authentication failed.")
+                client_sock.close()
+                del client
+                continue
+            print("[DEBUG] User authenticated.")
             _send = client.get_send()
             _terminal = None
             _username = client.username

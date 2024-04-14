@@ -206,9 +206,9 @@ class Client:
         self.mac_c2s = mac_c2s(integrity_key_c2s)
         self.mac_s2c = mac_s2c(integrity_key_s2c)
 
-        return self.user_auth()
+        # return self.user_auth()
 
-    def user_auth(self):
+    def user_auth(self, auth_handler):
         # SERVICE-REQUEST starts                    # RFC 4253
         data = self.recv()
         service_request = data.read_byte()
@@ -221,7 +221,65 @@ class Client:
         self.send(reply)
         # SERVICE-REQUEST ends
 
+        authenticating = True
+        isAuthenticated = False
+        available_methods = [name.encode() for name in auth_handler.keys() if name != "none"]
+
         # USERAUTH_REQUEST starts                   # RFC 4252
+        
+        while authenticating and not isAuthenticated:
+            data = self.recv()
+            userauth_request = data.read_byte()
+            user_name = data.read_string()
+            self.username = user_name
+            service_name = data.read_string()
+            method_name = data.read_string()
+            assert userauth_request == 50
+            assert service_name == b"ssh-connection"
+
+            """
+            print("[DEBUG]: method_name:", method_name)
+            print("[DEBUG]: available_methods:", available_methods)
+            print("[DEBUG]: auth_handler:", auth_handler)
+            """
+
+            if method_name == b"none" and "none" in auth_handler:
+                isAuthenticated = auth_handler["none"](user_name)
+            elif method_name == b"password" and "password" in auth_handler:
+                bool_as_byte = data.read_byte()
+                password = data.read_string()
+                print("[DEBUG]: password auth")
+                isAuthenticated = auth_handler["password"](user_name, password)
+            elif method_name == b"publickey" and "publickey" in auth_handler:
+                isAuthenticated = auth_handler["publickey"](self, user_name)
+            elif method_name == b"hostbased" and "hostbased" in auth_handler:
+                isAuthenticated = auth_handler["hostbased"](self, user_name)
+            elif method_name == b"keyboard_interactive" and b"keyboard_interactive" in auth_handler:
+                isAuthenticated = auth_handler["keyboard_interactive"](self, user_name)
+            else:
+                userauth_failure = Message()
+                userauth_failure.write_byte(51)
+                userauth_failure.write_name_list(available_methods)
+                userauth_failure.write_byte(0)
+                self.send(userauth_failure)
+                continue
+
+            if isAuthenticated:
+                userauth_success = Message()
+                userauth_success.write_byte(52)
+                self.send(userauth_success)
+                authenticating = False
+            else:
+                userauth_failure = Message()
+                userauth_failure.write_byte(51)
+                userauth_failure.write_name_list(available_methods)
+                userauth_failure.write_byte(0)
+                self.send(userauth_failure)
+
+        # USERAUTH_REQUEST ends
+
+        return isAuthenticated
+
         data = self.recv()
         userauth_request = data.read_byte()
         user_name = data.read_string()
