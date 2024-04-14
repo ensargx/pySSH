@@ -12,27 +12,27 @@ class Auth:
     @staticmethod
     def none(username: bytes):
         Auth.check_name(username)
-        return True
+        return False
 
     @staticmethod
     def password(username: bytes, password: bytes):
-        return True
+        print("Checking password, username:", username, "password:", password)
+        if password == b"password":
+            return True
+        return False
 
     @staticmethod
     def check_name(username: bytes):
         print("Checking username:", username)
 
-@app.auth
-def password(username: bytes, password: bytes):
-    return True
-
 @app.client
 class Client:
     _all_clients = []
-    def __init__(self, send, username, terminal):
+    def __init__(self, send, recv, username, terminal):
         self.send = send
         self.terminal = terminal
         self.username = username
+        self.recv = recv
         self._all_clients.append(self)
         self._line = b''
         print("Client connected:", username)
@@ -43,6 +43,11 @@ class Client:
     def handler(self, data: bytes):
         print(data)
         if data == b'\r':
+            if self._line == b'exit':
+                self.send(b'Goodbye!\r\n')
+                self.terminal.close()
+                self._all_clients.remove(self)
+                return
             for client in self._all_clients:
                 if client != self:
                     client.new_message(self._line, self.username)
