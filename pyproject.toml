@@ -1,0 +1,21 @@
+[project]
+name = "pyssh"
+authors = [
+    { name = "Ensar Gök", email = "ensargx@gmail.com" }
+]
+readme = "README.md"
+description = "Python SSH server"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+keywords = ["ssh", "python"]
+dynamic = ["version"]
+
+[project.urls]
+homepage = "https://github.com/ensargx/pySSH"
+
+[build-system]
+requires = ["setuptools>=61.0", "setuptools_scm[toml]>=6.3.2"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = { attr = "pyssh.__version__" }
