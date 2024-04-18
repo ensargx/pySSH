@@ -7,8 +7,7 @@ from pyssh.util import mpint, string
 from cryptography.hazmat.primitives.asymmetric import x25519
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
-
-from Crypto.Hash import SHA1, SHA256, SHA384, SHA512
+from cryptography.hazmat.primitives import hashes
 
 from typing import List, Protocol
 
@@ -125,7 +124,7 @@ class DHGroup1SHA1(KeyExchange):
     
     @staticmethod
     def hash(data: bytes):
-        return SHA1.new(data).digest()
+        return hashes.Hash(hashes.SHA1()).update(data).finalize()
     
     @property
     def H(self) -> bytes:
@@ -211,7 +210,7 @@ class DHGroup14SHA1(KeyExchange):
 
     @staticmethod
     def hash(data: bytes):
-        return SHA1.new(data).digest()
+        return hashes.Hash(hashes.SHA1()).update(data).finalize()
 
 class Curve25519SHA256(KeyExchange):
     """Elliptic Curve Diffie-Hellman Curve25519 Key Exchange with SHA-256
@@ -327,7 +326,7 @@ class Curve25519SHA256(KeyExchange):
 
     @staticmethod
     def hash(data: bytes):
-        return SHA256.new(data).digest()
+        return hashes.Hash(hashes.SHA256()).update(data).finalize()
 
 class ECDHSHA2NISTP256(KeyExchange):
     """
@@ -415,7 +414,7 @@ class ECDHSHA2NISTP256(KeyExchange):
 
     @staticmethod
     def hash(data: bytes) -> bytes:
-        return SHA256.new(data).digest()
+        return hashes.Hash(hashes.SHA256()).update(data).finalize()
 
 class ECDHSHA2NISTP384(KeyExchange):
     name = b'ecdh-sha2-nistp384'
@@ -499,7 +498,7 @@ class ECDHSHA2NISTP384(KeyExchange):
 
     @staticmethod
     def hash(data: bytes) -> bytes:
-        return SHA384.new(data).digest()
+        return hashes.Hash(hashes.SHA384()).update(data).finalize()
 
 class ECDHSHA2NISTP521(KeyExchange):
     name = b'ecdh-sha2-nistp521'
@@ -582,7 +581,7 @@ class ECDHSHA2NISTP521(KeyExchange):
 
     @staticmethod
     def hash(data: bytes) -> bytes:
-        return SHA512.new(data).digest()
+        return hashes.Hash(hashes.SHA512()).update(data).finalize()
 
 # TODO: implement!
 class SNTRUP761x25519SHA512(KeyExchange):
