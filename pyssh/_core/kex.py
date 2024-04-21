@@ -9,26 +9,19 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
 
-from typing import List
+from typing import List, Type
 
 from abc import ABC, abstractmethod
 
 class KEX(ABC):
     name: bytes 
     session_id: bytes
-
-    @classmethod 
-    @abstractmethod 
-    def _hash_algorithm(cls) -> hashes.HashAlgorithm:
-        pass 
-
-    @classmethod
-    def _create_hash(cls) -> hashes.Hash:
-        return hashes.Hash(cls._hash_algorithm())
+    _hash: Type[hashes.HashAlgorithm]
 
     @classmethod 
     def hash(cls, data: bytes) -> bytes:
-        h = cls._create_hash()
+        _hash_algorithm = cls._hash
+        h = hashes.Hash(_hash_algorithm())
         h.update(data)
         return h.finalize()
 
@@ -54,6 +47,7 @@ class DHGroup1SHA1(KEX):
     p = 179769313486231590770839156793787453197860296048756011706444423684197180216158519368947833795864925541502180565485980503646440548199239100050792877003355816639229553136239076508735759914822574862575007425302077447712589550957937778424442426617334727629299387668709205606050270810842907692932019128194467627007
     g = 2
     q = 89884656743115795385419578396893726598930148024378005853222211842098590108079259684473916897932462770751090282742990251823220274099619550025396438501677908319614776568119538254367879957411287431287503712651038723856294775478968889212221213308667363814649693834354602803025135405421453846466009564097233813503
+    _hash = hashes.SHA1
 
     def __init__(self, e: int):
         self.e = e
@@ -109,10 +103,6 @@ class DHGroup1SHA1(KEX):
         else:
             raise ValueError("Invalid message code")
 
-    @classmethod
-    def _hash_algorithm(cls) -> hashes.HashAlgorithm:
-        return hashes.SHA1()
-
     @property
     def K(self) -> int:
         """
@@ -133,6 +123,7 @@ class DHGroup14SHA1(KEX):
     p = 32317006071311007300338913926423828248817941241140239112842009751400741706634354222619689417363569347117901737909704191754605873209195028853758986185622153212175412514901774520270235796078236248884246189477587641105928646099411723245426622522193230540919037680524235519125679715870117001058055877651038861847280257976054903569732561526167081339361799541336476559160368317896729073178384589680639671900977202194168647225871031411336429319536193471636533209717077448227988588565369208645296636077250268955505928362751121174096972998068410554359584866583291642136218231078990999448652468262416972035911852507045361090559
     g = 2
     q = 16158503035655503650169456963211914124408970620570119556421004875700370853317177111309844708681784673558950868954852095877302936604597514426879493092811076606087706257450887260135117898039118124442123094738793820552964323049705861622713311261096615270459518840262117759562839857935058500529027938825519430923640128988027451784866280763083540669680899770668238279580184158948364536589192294840319835950488601097084323612935515705668214659768096735818266604858538724113994294282684604322648318038625134477752964181375560587048486499034205277179792433291645821068109115539495499724326234131208486017955926253522680545279
+    _hash = hashes.SHA1
 
     def __init__(self, e: int):
         self.e = e
@@ -202,9 +193,6 @@ class DHGroup14SHA1(KEX):
         """
         return self.hash_h
 
-    @classmethod
-    def _hash_algorithm(cls) -> hashes.HashAlgorithm:
-        return hashes.SHA1()
 
 class Curve25519SHA256(KEX):
     """Elliptic Curve Diffie-Hellman Curve25519 Key Exchange with SHA-256
@@ -212,6 +200,7 @@ class Curve25519SHA256(KEX):
     RFC7748#6.1
     """
     name = b'curve25519-sha256'
+    _hash = hashes.SHA256
 
     def __init__(self, Q_C) -> None:
         if len(Q_C) != 32:
@@ -318,15 +307,12 @@ class Curve25519SHA256(KEX):
         """
         return self.hash_h
 
-    @classmethod 
-    def _hash_algorithm(cls) -> hashes.HashAlgorithm:
-        return hashes.SHA256() 
-
 class ECDHSHA2NISTP256(KEX):
     """
     Elliptic Curve Diffie-Hellman NIST P-256 Key Exchange with SHA-256
     """
     name = b'ecdh-sha2-nistp256'
+    _hash = hashes.SHA256
 
     def __init__(self, Q_C):
         if len(Q_C) != 65:
@@ -406,12 +392,9 @@ class ECDHSHA2NISTP256(KEX):
     def H(self) -> bytes:
         return self.hash_h
 
-    @classmethod 
-    def _hash_algorithm(cls) -> hashes.HashAlgorithm:
-        return hashes.SHA256() 
-
 class ECDHSHA2NISTP384(KEX):
     name = b'ecdh-sha2-nistp384'
+    _hash = hashes.SHA384
 
     def __init__(self, Q_C):
         if len(Q_C) != 97:
@@ -490,12 +473,9 @@ class ECDHSHA2NISTP384(KEX):
     def H(self) -> bytes:
         return self.hash_h
 
-    @classmethod
-    def _hash_algorithm(cls) -> hashes.HashAlgorithm:
-        return hashes.SHA384()
-
 class ECDHSHA2NISTP521(KEX):
     name = b'ecdh-sha2-nistp521'
+    _hash = hashes.SHA512
 
     def __init__(self, Q_C):
         if len(Q_C) != 133:
@@ -572,10 +552,6 @@ class ECDHSHA2NISTP521(KEX):
     @property
     def H(self) -> bytes:
         return self.hash_h
-
-    @classmethod
-    def _hash_algorithm(cls) -> hashes.HashAlgorithm:
-        return hashes.SHA512()
 
 # TODO: implement!
 class SNTRUP761x25519SHA512:
