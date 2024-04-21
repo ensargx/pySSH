@@ -9,52 +9,46 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
 
-from typing import List, Protocol
+from typing import List
 
-class KeyExchange(Protocol):
-    """
-    Key Exchange Protocol
+from abc import ABC, abstractmethod
 
-    This protocol will get K, H, and session id for the session.
-    And return 'kex' attribute to client which has these variables.
-    """
-    name: bytes
+class KEX(ABC):
+    name: bytes 
     session_id: bytes
 
-    @staticmethod
-    def protocol(client, client_kex_init: Reader, server_kex_init: Reader) -> 'KeyExchange':
-        """
-        Key Exchange Protocol.
+    @classmethod 
+    @abstractmethod 
+    def _hash_algorithm(cls) -> hashes.HashAlgorithm:
+        pass 
 
-        This protocol will get K, H, and session id for the session.
-        Also will add 'kex' attribute to client which has these variables.
-        session id will be added to client as attribute as well
-        """
-        ...
+    @classmethod
+    def _create_hash(cls) -> hashes.Hash:
+        return hashes.Hash(cls._hash_algorithm())
 
-    @property
-    def K(self) -> int:
-        """
-        Shared Secret Key
-        """
-        ...
-
-    @property
-    def H(self) -> bytes:
-        """
-        Shared Hash
-        """
-        ...
+    @classmethod 
+    def hash(cls, data: bytes) -> bytes:
+        h = cls._create_hash()
+        h.update(data)
+        return h.finalize()
 
     @staticmethod
-    def hash(data: bytes) -> bytes:
-        """
-        Hash Function
-        """
-        ...
+    @abstractmethod
+    def protocol(client, client_kex_init: Reader, server_kex_init: Reader) -> 'KEX':
+        pass 
+
+    @property
+    @abstractmethod 
+    def K(self) -> int: 
+        pass 
+
+    @property 
+    @abstractmethod 
+    def H(self) -> bytes: 
+        pass 
 
 
-class DHGroup1SHA1(KeyExchange):
+class DHGroup1SHA1(KEX):
     """Diffie-Hellman Group 1 Key Exchange with SHA-1"""
     name = b'diffie-hellman-group1-sha1'
     p = 179769313486231590770839156793787453197860296048756011706444423684197180216158519368947833795864925541502180565485980503646440548199239100050792877003355816639229553136239076508735759914822574862575007425302077447712589550957937778424442426617334727629299387668709205606050270810842907692932019128194467627007
@@ -115,16 +109,16 @@ class DHGroup1SHA1(KeyExchange):
         else:
             raise ValueError("Invalid message code")
 
+    @classmethod
+    def _hash_algorithm(cls) -> hashes.HashAlgorithm:
+        return hashes.SHA1()
+
     @property
     def K(self) -> int:
         """
         Shared Secret Key
         """
         return self.k
-    
-    @staticmethod
-    def hash(data: bytes):
-        return hashes.Hash(hashes.SHA1()).update(data).finalize()
     
     @property
     def H(self) -> bytes:
@@ -133,7 +127,7 @@ class DHGroup1SHA1(KeyExchange):
         """
         return self.hash_h
 
-class DHGroup14SHA1(KeyExchange):
+class DHGroup14SHA1(KEX):
     """Diffie-Hellman Group 14 Key Exchange with SHA-1"""
     name = b'diffie-hellman-group14-sha1'
     p = 32317006071311007300338913926423828248817941241140239112842009751400741706634354222619689417363569347117901737909704191754605873209195028853758986185622153212175412514901774520270235796078236248884246189477587641105928646099411723245426622522193230540919037680524235519125679715870117001058055877651038861847280257976054903569732561526167081339361799541336476559160368317896729073178384589680639671900977202194168647225871031411336429319536193471636533209717077448227988588565369208645296636077250268955505928362751121174096972998068410554359584866583291642136218231078990999448652468262416972035911852507045361090559
@@ -208,11 +202,11 @@ class DHGroup14SHA1(KeyExchange):
         """
         return self.hash_h
 
-    @staticmethod
-    def hash(data: bytes):
-        return hashes.Hash(hashes.SHA1()).update(data).finalize()
+    @classmethod
+    def _hash_algorithm(cls) -> hashes.HashAlgorithm:
+        return hashes.SHA1()
 
-class Curve25519SHA256(KeyExchange):
+class Curve25519SHA256(KEX):
     """Elliptic Curve Diffie-Hellman Curve25519 Key Exchange with SHA-256
     
     RFC7748#6.1
@@ -324,11 +318,11 @@ class Curve25519SHA256(KeyExchange):
         """
         return self.hash_h
 
-    @staticmethod
-    def hash(data: bytes):
-        return hashes.Hash(hashes.SHA256()).update(data).finalize()
+    @classmethod 
+    def _hash_algorithm(cls) -> hashes.HashAlgorithm:
+        return hashes.SHA256() 
 
-class ECDHSHA2NISTP256(KeyExchange):
+class ECDHSHA2NISTP256(KEX):
     """
     Elliptic Curve Diffie-Hellman NIST P-256 Key Exchange with SHA-256
     """
@@ -412,11 +406,11 @@ class ECDHSHA2NISTP256(KeyExchange):
     def H(self) -> bytes:
         return self.hash_h
 
-    @staticmethod
-    def hash(data: bytes) -> bytes:
-        return hashes.Hash(hashes.SHA256()).update(data).finalize()
+    @classmethod 
+    def _hash_algorithm(cls) -> hashes.HashAlgorithm:
+        return hashes.SHA256() 
 
-class ECDHSHA2NISTP384(KeyExchange):
+class ECDHSHA2NISTP384(KEX):
     name = b'ecdh-sha2-nistp384'
 
     def __init__(self, Q_C):
@@ -496,11 +490,11 @@ class ECDHSHA2NISTP384(KeyExchange):
     def H(self) -> bytes:
         return self.hash_h
 
-    @staticmethod
-    def hash(data: bytes) -> bytes:
-        return hashes.Hash(hashes.SHA384()).update(data).finalize()
+    @classmethod
+    def _hash_algorithm(cls) -> hashes.HashAlgorithm:
+        return hashes.SHA384()
 
-class ECDHSHA2NISTP521(KeyExchange):
+class ECDHSHA2NISTP521(KEX):
     name = b'ecdh-sha2-nistp521'
 
     def __init__(self, Q_C):
@@ -579,38 +573,38 @@ class ECDHSHA2NISTP521(KeyExchange):
     def H(self) -> bytes:
         return self.hash_h
 
-    @staticmethod
-    def hash(data: bytes) -> bytes:
-        return hashes.Hash(hashes.SHA512()).update(data).finalize()
+    @classmethod
+    def _hash_algorithm(cls) -> hashes.HashAlgorithm:
+        return hashes.SHA512()
 
 # TODO: implement!
-class SNTRUP761x25519SHA512(KeyExchange):
+class SNTRUP761x25519SHA512:
     name = b'sntrup761x25519-sha512'
     # Streamlined NTRU Prime with p = 761, q = 4591, and w = 286.
     ...
 
 # TODO: implement
-class DHGroupExchangeSHA256(KeyExchange):
+class DHGroupExchangeSHA256:
     name = b'diffie-hellman-group-exchange-sha256'
     ...
 
 # TODO: implement
-class DHGroup14SHA512(KeyExchange):
+class DHGroup14SHA512:
     name = b'diffie-hellman-group14-sha512'
     ...
 
 # TODO: implement
-class DHGroup16SHA512(KeyExchange):
+class DHGroup16SHA512:
     name = b'diffie-hellman-group16-sha512'
     ...
 
 # TODO: implement
-class DHGroup18SHA512(KeyExchange):
+class DHGroup18SHA512:
     name = b'diffie-hellman-group18-sha512'
     ...
 
 # TODO: implement
-class DHGroupExchangeSHA1(KeyExchange):
+class DHGroupExchangeSHA1:
     name = b'diffie-hellman-group-exchange-sha1'
     ...
 
@@ -635,7 +629,7 @@ supported_algorithms = {
     # b'sntrup761x25519-sha512@openssh.com': SNTRUP761x25519SHA512,
 }
 
-def select_algorithm(client_algorithms: List[bytes], server_algorithms: List[bytes]) -> KeyExchange:
+def select_algorithm(client_algorithms: List[bytes], server_algorithms: List[bytes]) -> KEX:
     """
     Selects the most secure algorithm from the given list of algorithms.
 
