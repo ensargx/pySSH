@@ -6,7 +6,11 @@ Hey, I am trying to make an SSH server with Python. It will be costumizable and 
 Feel free give me feedbacks and suggestions.
 
 ## Install
-You can easily install pyssh with `pip install pyssh@git+https://github.com/ensargx/pyssg`
+You can easily install pyssh with 
+
+```bash
+pip install pyssh@git+https://github.com/ensargx/pyssh
+```
 
 Or, you can clone the repository and build it on your machine
 
