@@ -9,6 +9,9 @@ requires-python = ">=3.10"
 license = { file = "LICENSE" }
 keywords = ["ssh", "python"]
 dynamic = ["version"]
+dependencies = [
+    "cryptography>=3.4.7",
+]
 
 [project.urls]
 homepage = "https://github.com/ensargx/pySSH"
@@ -18,4 +21,6 @@ requires = ["setuptools>=61.0", "setuptools_scm[toml]>=6.3.2"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.dynamic]
-version = { attr = "pyssh.__version__" }
+version = { attr = "pyssh.version.__version__" }
+
+[tool.setuptools_scm]
