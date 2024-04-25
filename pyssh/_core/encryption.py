@@ -1,7 +1,8 @@
 from typing import List, Protocol
 
-from Crypto.Cipher import AES
-from Crypto.Util import Counter
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.ciphers.modes import CTR
+from cryptography.hazmat.primitives.ciphers.algorithms import AES 
 
 class Encryption(Protocol):
     cipher_block_size: int
@@ -37,14 +38,18 @@ class EncryptionNone(Encryption):
 class AES128CTR:
     cipher_block_size = 16
     def __init__(self, encryption_key: bytes, initial_iv: bytes):
-        self.ctr = Counter.new(128, initial_value=int.from_bytes(initial_iv[:16], "big"))
-        self.cipher = AES.new(encryption_key[:16], AES.MODE_CTR, counter=self.ctr)
+        print("initial_iv: ", initial_iv, "len: ", len(initial_iv))
+        self.ctr = CTR(initial_iv[:16])
+        self.cipher = Cipher(AES(encryption_key[:16]), self.ctr, None)
+
+        self.encryptor = self.cipher.encryptor()
+        self.decryptor = self.cipher.decryptor()
 
     def encrypt(self, plaintext: bytes) -> bytes:
-        return self.cipher.encrypt(plaintext)
+        return self.encryptor.update(plaintext)
 
     def decrypt(self, ciphertext: bytes) -> bytes:
-        return self.cipher.decrypt(ciphertext)
+        return self.decryptor.update(ciphertext)
 
 
 supperted_algorithms = {
