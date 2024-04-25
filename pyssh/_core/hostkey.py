@@ -1,9 +1,5 @@
 from typing import List
 
-from Crypto.PublicKey import DSA, ECC
-from Crypto.Signature import pkcs1_15, DSS
-from Crypto.Hash import SHA1, SHA256
-
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import dsa, rsa, ec
 from cryptography.hazmat.primitives.asymmetric import padding
