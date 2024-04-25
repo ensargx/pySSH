@@ -1,147 +1,109 @@
 from typing import List
 
-from Crypto.PublicKey import RSA, DSA, ECC
+from Crypto.PublicKey import DSA, ECC
 from Crypto.Signature import pkcs1_15, DSS
 from Crypto.Hash import SHA1, SHA256
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import dsa, rsa, ec
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes
+
 from pyssh.util import mpint, string
 
-from typing import Protocol
+from typing import Optional, Type
+from abc import ABC, abstractmethod
 
-class HostKey(Protocol):
+class HostKey(ABC):
     name: bytes
+    _hasher: Type[hashes.HashAlgorithm]
 
-    def __init__(self, key_path: str):
+    @abstractmethod
+    def __init__(self, key):
         ...
 
-    def get_name(self) -> bytes:
-        ...
-
+    @abstractmethod
     def get_key(self) -> bytes:
         ...
 
     def sign(self, data: bytes) -> bytes:
-        ...
+        _hasher = self._hasher()
+        _padding = self._padding()
+        private_key = self.private_key
+        signature = private_key.sign(data, _padding, _hasher)
+        signature = string(self.name) + string(signature)
+        return signature
 
 
 class RSAKey(HostKey):
     name = b"ssh-rsa"
+    _hasher = hashes.SHA1
+    _padding = padding.PKCS1v15
 
-    def __init__(self, key_path: str):
-        self.private_key_path = key_path
-        self.public_key_path = key_path + ".pub"
-
-        self.public_key = RSA.importKey(open(self.public_key_path, "rb").read())
-        self.private_key = RSA.importKey(open(self.private_key_path, "rb").read())
-        self._pkcs1_15 = pkcs1_15.new(self.private_key)
-
-        self.n = self.public_key.n
-        self.e = self.public_key.e
-        self.d = self.private_key.d
-        self.p = self.private_key.p
-        self.q = self.private_key.q
-        self.u = self.private_key.u
-
-    def get_name(self):
-        return b"ssh-rsa"
+    def __init__(self, rsa):
+        self.private_key = rsa
+        print(rsa)
     
     def get_key(self):
-        return string(b"ssh-rsa") + mpint(self.public_key.e) + mpint(self.public_key.n)
+        public_numbers = self.private_key.public_key().public_numbers()
+        return string(self.name) + mpint(public_numbers.e) + mpint(public_numbers.n)
 
-    def sign(self, data: bytes) -> bytes:
-        signature = self._pkcs1_15.sign(SHA1.new(data))
-        signature = string(b"ssh-rsa") + string(signature)
-        return signature
-
-    # TODO: Delete this
-    def sign_sha1(self, data: bytes) -> bytes:
-        signature = self._pkcs1_15.sign(SHA1.new(data))
-        signature = string(b"ssh-rsa") + string(signature)
-        return signature
-    
-    def sign_sha256(self, data: bytes) -> bytes:
-        signature = self._pkcs1_15.sign(SHA256.new(data))
-        signature = string(b"ssh-rsa") + string(signature)
-        return signature
-
-# TODO: Test this
 class DSAKey(HostKey):
     name = b"ssh-dss"
+    _hasher = hashes.SHA1
+    _padding = padding.PSS
 
-    def __init__(self, key_path: str):
-        self.private_key_path = key_path
-        self.public_key_path = key_path + ".pub"
+    def __init__(self, key):
+        self.private_key = key
 
-        self.public_key = DSA.importKey(open(self.public_key_path, "rb").read())
-        self.private_key = DSA.importKey(open(self.private_key_path, "rb").read())
-        self._pkcs1_15 = DSS.new(self.private_key, "fips-186-3")
-
-        self.p = self.public_key.p
-        self.q = self.public_key.q
-        self.g = self.public_key.g
-        self.y = self.public_key.y
-        self.x = self.private_key.x
-
-    def get_name(self):
-        return b"ssh-dss"
-    
     def get_key(self):
-        return string(b"ssh-dss") + mpint(self.public_key.p) + mpint(self.public_key.q) + mpint(self.public_key.g) + mpint(self.public_key.y)
-
-    def sign(self, data: bytes) -> bytes:
-        signature = self._pkcs1_15.sign(SHA1.new(data))
-        signature = string(b"ssh-dss") + string(signature)
-        return signature
-
+        public_numbers = self.private_key.public_numbers()
+        return string(b"ssh-dss") + mpint(public_numbers.y) + mpint(public_numbers.g) + mpint(public_numbers.p) + mpint(public_numbers.q)
 
 class ECDSASHA2NISTP256(HostKey):
     name = b"ecdsa-sha2-nistp256"
+    _hasher = hashes.SHA256
+    _padding = padding.PSS 
 
-    def __init__(self, key_path: str):
-        self.private_key_path = key_path
-        self.public_key_path = key_path + ".pub"
-
-        self.private_key = ECC.import_key(open(self.private_key_path, "rb").read())
-        self.public_key = ECC.import_key(open(self.public_key_path, "rb").read())
-
-        self.signer = DSS.new(self.private_key, "fips-186-3")
-
-    def sign(self, data: bytes) -> bytes:
-        signature = self.signer.sign(SHA256.new(data))
-        signature = string(b"ecdsa-sha2-nistp256") + string(signature)
-        return signature
-
-    def get_name(self):
-        return b"ecdsa-sha2-nistp256"
+    def __init__(self, key):
+        self.private_key = key
 
     def get_key(self):
-        return string(b"ecdsa-sha2-nistp256") + string(b"nistp256") + string(self.public_key.export_key(format="raw"))
+        public_numbers = self.private_key.public_key().public_numbers()
+        return string(b"ecdsa-sha2-nistp256") + string(b"nistp256") + mpint(public_numbers.x) + mpint(public_numbers.y)
 
-class ED25519(HostKey):
+class ED25519:
     ...
 
 
 supported_algorithms = {
     b"ssh-rsa": RSAKey,
-    # b"ecdsa-sha2-nistp256": ECDSASHA2NISTP256,
+    b"ecdsa-sha2-nistp256": ECDSASHA2NISTP256,
+    b"ssh-dss": DSAKey,
+    # b"ssh-ed25519": ED25519,
 }
 
-def load_key(path: str):
+def load_key(path: str, password: Optional[bytes] = None) -> HostKey:
     """
     Loads a hostkey from a file.
 
     :param path: The path to the file.
     :return: The hostkey.
     """
-    if path.endswith(".pub"):
-        path = path[:-4]
+    with open(path, "rb") as file:
+        private_key = serialization.load_pem_private_key(
+            file.read(),
+            password=password
+        )
 
-    for key_type in supported_algorithms.values():
-        try:
-            print("DEBUG: Trying", key_type)
-            return key_type(path)
-        except ValueError:
-            continue
+    if isinstance(private_key, rsa.RSAPrivateKey):
+        return RSAKey(private_key)
+
+    if isinstance(private_key, dsa.DSAPrivateKey):
+        return DSAKey(private_key)
+
+    if isinstance(private_key, ec.EllipticCurvePrivateKey):
+        return ECDSASHA2NISTP256(private_key)
 
     raise ValueError("Hostkey not supported:", path)
 

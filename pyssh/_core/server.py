@@ -34,8 +34,8 @@ class pySSH:
             if filename in hostkeys:
                 # Add hostkey to list
                 key = hostkey.load_key(os.path.join(self.hostkeys_path, filename))
-                print("DEBUG: Loaded hostkey: ", key.get_name())
-                self.hostkeys[key.get_name()] = key
+                print("DEBUG: Loaded hostkey: ", key.name)
+                self.hostkeys[key.name] = key
         # Check if there are any hostkeys
         print("DEBUG: Hostkeys: ", self.hostkeys)
         if len(self.hostkeys) == 0:
