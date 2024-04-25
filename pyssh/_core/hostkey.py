@@ -44,18 +44,6 @@ class RSAKey(HostKey):
         public_numbers = self.private_key.public_key().public_numbers()
         return string(self.name) + mpint(public_numbers.e) + mpint(public_numbers.n)
 
-class DSAKey(HostKey):
-    name = b"ssh-dss"
-    _hasher = hashes.SHA1
-    _padding = padding.PSS
-
-    def __init__(self, key):
-        self.private_key = key
-
-    def get_key(self):
-        public_numbers = self.private_key.public_numbers()
-        return string(b"ssh-dss") + mpint(public_numbers.y) + mpint(public_numbers.g) + mpint(public_numbers.p) + mpint(public_numbers.q)
-
 class ECDSASHA2NISTP256(HostKey):
     name = b"ecdsa-sha2-nistp256"
     _hasher = hashes.SHA256
@@ -75,7 +63,6 @@ class ED25519:
 supported_algorithms = {
     b"ssh-rsa": RSAKey,
     b"ecdsa-sha2-nistp256": ECDSASHA2NISTP256,
-    b"ssh-dss": DSAKey,
     # b"ssh-ed25519": ED25519,
 }
 
