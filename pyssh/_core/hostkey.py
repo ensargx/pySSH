@@ -1,9 +1,12 @@
 from typing import List
 
-from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import dsa, rsa, ec
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.serialization import load_ssh_private_key
+
+# @todo: fix key import and signing 
+# and maybe improve oop design 
 
 from pyssh.util import mpint, string
 
@@ -64,8 +67,8 @@ class ECDSASHA2NISTP256(HostKey):
         private_key = self.private_key
         signature = private_key.sign(data, ec.ECDSA(_hasher))
         signature = string(self.name) + string(signature)
+        print("signature:", signature)
         return signature
-
 
 class ECDSASHA2NISTP384(HostKey):
     name = b"ecdsa-sha2-nistp384"
@@ -95,9 +98,9 @@ class ED25519:
 
 supported_algorithms = {
     b"ssh-rsa": RSAKey,
-    # b"ecdsa-sha2-nistp256": ECDSASHA2NISTP256,
-    # b"ecdsa-sha2-nistp384": ECDSASHA2NISTP384,
-    # b"ecdsa-sha2-nistp521": ECDSASHA2NISTP521,
+    b"ecdsa-sha2-nistp256": ECDSASHA2NISTP256,
+    b"ecdsa-sha2-nistp384": ECDSASHA2NISTP384,
+    b"ecdsa-sha2-nistp521": ECDSASHA2NISTP521,
     # b"ssh-ed25519": ED25519,
 }
 
@@ -108,20 +111,30 @@ def load_key(path: str, password: Optional[bytes] = None) -> HostKey:
     :param path: The path to the file.
     :return: The hostkey.
     """
-    print(path) 
-    with open(path, "rb") as file:
-        private_key = serialization.load_pem_private_key(
-            file.read(),
-            password=password
-        )
+    print("Loading key:", path)
+    try:
+        key = load_ssh_private_key(open(path, "rb").read(), password)
+    except ValueError:
+        raise ValueError("Invalid key file.")
 
-    if isinstance(private_key, rsa.RSAPrivateKey):
-        return RSAKey(private_key)
+    if isinstance(key, rsa.RSAPrivateKey):
+        return RSAKey(key)
 
-    if isinstance(private_key, ec.EllipticCurvePrivateKey):
-        return ECDSASHA2NISTP256(private_key)
+    elif isinstance(key, ec.EllipticCurvePrivateKey):
+        if key.curve.name == "secp256r1":
+            return ECDSASHA2NISTP256(key)
+        elif key.curve.name == "secp384r1":
+            return ECDSASHA2NISTP384(key)
+        elif key.curve.name == "secp521r1":
+            return ECDSASHA2NISTP521(key)
+        else:
+            raise ValueError("Unsupported curve.")
 
-    raise ValueError("Hostkey not supported:", path)
+    elif isinstance(key, dsa.DSAPrivateKey):
+        raise ValueError("DSA is not supported.")
+
+    raise ValueError("Unsupported key type.")
+
 
 def select_algorithm(algorithms: List[bytes]) -> bytes:
     """
