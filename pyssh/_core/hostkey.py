@@ -5,6 +5,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization import load_ssh_private_key
 from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+from cryptography.hazmat.primitives import serialization 
 
 # @todo: fix key import and signing 
 # and maybe improve oop design 
@@ -59,16 +60,15 @@ class ECDSASHA2NISTP256(HostKey):
         self.private_key = key
 
     def get_key(self):
-        public_numbers = self.private_key.public_key().public_numbers()
-        return string(b"ecdsa-sha2-nistp256") + string(b"nistp256") + mpint(public_numbers.x) + mpint(public_numbers.y)
+        public_key = self.private_key.public_key()
+        Q_bytes = public_key.public_bytes(encoding=serialization.Encoding.X962, format=serialization.PublicFormat.UncompressedPoint)
+        return string(b"ecdsa-sha2-nistp256") + string(b"nistp256") + string(Q_bytes)
 
     def sign(self, data: bytes) -> bytes:
-        print("signing")
         ecdsa = ec.ECDSA(self._hasher())
         sig = self.private_key.sign(data, ecdsa)
         r, s = decode_dss_signature(sig)
         signature = string(self.name) + string(mpint(r) + mpint(s))
-        print("signature:", signature)
         return signature
 
 class ECDSASHA2NISTP384(HostKey):
