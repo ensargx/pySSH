@@ -3,7 +3,7 @@ import os
 from pyssh._core import kex, hostkey, mac 
 
 class pySSH:
-    def __init__(self, hostkey_path: str = './keys/'):
+    def __init__(self, hostkey_path: str = ''):
         """
         Initializes the SSH server.
         """
@@ -22,24 +22,34 @@ class pySSH:
             'ssh_host_ecdsa_key',
             'ssh_host_ed25519_key',
         ]
-        # Loop over files in hostkeys_path
-        for filename in os.listdir(self.hostkeys_path):
-            """
-            # Check if file is a hostkey
-            if filename in hostkeys:
-                # Add hostkey to list
-                key = hostkey.load_key(self.hostkeys_path + filename)
-                self.hostkeys[key.get_name()] = key
-            """
-            if filename in hostkeys:
-                # Add hostkey to list
-                key = hostkey.load_key(os.path.join(self.hostkeys_path, filename))
-                print("DEBUG: Loaded hostkey: ", key.name)
-                self.hostkeys[key.name] = key
-        # Check if there are any hostkeys
-        print("DEBUG: Hostkeys: ", self.hostkeys)
-        if len(self.hostkeys) == 0:
-            raise ValueError("No hostkeys found.")
+        if self.hostkeys_path and os.path.exists(self.hostkeys_path):
+            # Loop over files in hostkeys_path
+            for filename in os.listdir(self.hostkeys_path):
+                """
+                # Check if file is a hostkey
+                if filename in hostkeys:
+                    # Add hostkey to list
+                    key = hostkey.load_key(self.hostkeys_path + filename)
+                    self.hostkeys[key.get_name()] = key
+                """
+                if filename in hostkeys:
+                    # Add hostkey to list
+                    key = hostkey.load_key(os.path.join(self.hostkeys_path, filename))
+                    print("DEBUG: Loaded hostkey: ", key.name)
+                    self.hostkeys[key.name] = key
+            # Check if there are any hostkeys
+            print("DEBUG: Hostkeys: ", self.hostkeys)
+            if len(self.hostkeys) == 0:
+                raise ValueError("No hostkeys found.")
+        else:
+            print("INFO: No hostkeys path specified, or path does not exist.")
+            print("INFO: Generating new hostkeys.")
+            # Create new hostkeys
+            ssh_rsa_key = hostkey.generate_key(b'ssh-rsa')
+            ssh_ecdsa_key = hostkey.generate_key(b'ecdsa-sha2-nistp256')
+            self.hostkeys[ssh_rsa_key.name] = ssh_rsa_key 
+            self.hostkeys[ssh_ecdsa_key.name] = ssh_ecdsa_key 
+            print("DEBUG: Hostkeys: ", self.hostkeys)
 
     def client(self, cls):
         """

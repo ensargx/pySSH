@@ -136,6 +136,27 @@ def load_key(path: str, password: Optional[bytes] = None) -> HostKey:
 
     raise ValueError("Unsupported key type.")
 
+def generate_key(algorithm: bytes) -> HostKey:
+    """
+    Generates a new hostkey.
+
+    :param algorithm: The algorithm to use.
+    :return: The hostkey.
+    """
+    if algorithm == b"ssh-rsa":
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        return RSAKey(key)
+    elif algorithm == b"ecdsa-sha2-nistp256":
+        key = ec.generate_private_key(ec.SECP256R1())
+        return ECDSASHA2NISTP256(key)
+    elif algorithm == b"ecdsa-sha2-nistp384":
+        key = ec.generate_private_key(ec.SECP384R1())
+        return ECDSASHA2NISTP384(key)
+    elif algorithm == b"ecdsa-sha2-nistp521":
+        key = ec.generate_private_key(ec.SECP521R1())
+        return ECDSASHA2NISTP521(key)
+    else:
+        raise ValueError("Unsupported algorithm.")
 
 def select_algorithm(algorithms: List[bytes]) -> bytes:
     """
