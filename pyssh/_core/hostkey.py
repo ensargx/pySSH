@@ -80,7 +80,7 @@ class ECDSASHA2NISTP256(ECDSAKey):
         Q_bytes = public_key.public_bytes(encoding=serialization.Encoding.X962, format=serialization.PublicFormat.UncompressedPoint)
         return string(b"ecdsa-sha2-nistp256") + string(b"nistp256") + string(Q_bytes)
 
-class ECDSASHA2NISTP384(HostKey):
+class ECDSASHA2NISTP384(ECDSAKey):
     name = b"ecdsa-sha2-nistp384"
     _hasher = hashes.SHA384
 
@@ -91,7 +91,7 @@ class ECDSASHA2NISTP384(HostKey):
         public_numbers = self.private_key.public_key().public_numbers()
         return string(b"ecdsa-sha2-nistp384") + string(b"nistp384") + mpint(public_numbers.x) + mpint(public_numbers.y)
 
-class ECDSASHA2NISTP521(HostKey):
+class ECDSASHA2NISTP521(ECDSAKey):
     name = b"ecdsa-sha2-nistp521"
     _hasher = hashes.SHA512
 
