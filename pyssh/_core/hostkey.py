@@ -27,13 +27,9 @@ class HostKey(ABC):
     def get_key(self) -> bytes:
         ...
 
+    @abstractmethod
     def sign(self, data: bytes) -> bytes:
-        _hasher = self._hasher()
-        _padding = self._padding()
-        private_key = self.private_key
-        signature = private_key.sign(data, _padding, _hasher)
-        signature = string(self.name) + string(signature)
-        return signature
+        ...
 
 
 class RSAKey(HostKey):
@@ -44,17 +40,37 @@ class RSAKey(HostKey):
     def __init__(self, rsa):
         self.private_key = rsa
         print(rsa)
+
+    def sign(self, data: bytes) -> bytes:
+        _hasher = self._hasher()
+        _padding = self._padding()
+        private_key = self.private_key
+        signature = private_key.sign(data, _padding, _hasher)
+        signature = string(self.name) + string(signature)
+        return signature
     
     def get_key(self):
         public_numbers = self.private_key.public_key().public_numbers()
         return string(self.name) + mpint(public_numbers.e) + mpint(public_numbers.n)
 
-class ECDSASHA2NISTP256(HostKey):
+class ECDSAKey(HostKey):
+    name: bytes
+    _hasher: Type[hashes.HashAlgorithm]
+    private_key: ec.EllipticCurvePrivateKey
+
+    def sign(self, data: bytes) -> bytes:
+        ecdsa = ec.ECDSA(self._hasher())
+        sig = self.get_private_key().sign(data, ecdsa)
+        r, s = decode_dss_signature(sig)
+        signature = string(self.name) + string(mpint(r) + mpint(s))
+        return signature
+
+    def get_private_key(self) -> ec.EllipticCurvePrivateKey:
+        return self.private_key
+
+class ECDSASHA2NISTP256(ECDSAKey):
     name = b"ecdsa-sha2-nistp256"
     _hasher = hashes.SHA256
-
-    def _padding(self):
-        return None
 
     def __init__(self, key):
         self.private_key = key
@@ -63,13 +79,6 @@ class ECDSASHA2NISTP256(HostKey):
         public_key = self.private_key.public_key()
         Q_bytes = public_key.public_bytes(encoding=serialization.Encoding.X962, format=serialization.PublicFormat.UncompressedPoint)
         return string(b"ecdsa-sha2-nistp256") + string(b"nistp256") + string(Q_bytes)
-
-    def sign(self, data: bytes) -> bytes:
-        ecdsa = ec.ECDSA(self._hasher())
-        sig = self.private_key.sign(data, ecdsa)
-        r, s = decode_dss_signature(sig)
-        signature = string(self.name) + string(mpint(r) + mpint(s))
-        return signature
 
 class ECDSASHA2NISTP384(HostKey):
     name = b"ecdsa-sha2-nistp384"
